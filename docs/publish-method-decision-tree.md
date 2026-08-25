@@ -25,21 +25,34 @@ result = publish("weixin", title="...", description="...", video="/path/to/v.mp4
 # 3. 全部失败 → 标记为 fail，记录到 publish_state.json
 ```
 
-## 各平台能力现状（2026-08-25 17:00 UTC）
+## 各平台能力现状（2026-08-25 21:33 UTC，4/4 全成功）
 
 | 平台 | API upload | API publish | 浏览器 fallback | 真实状态 |
 |------|----------|------------|---------------|---------|
 | 小红书 (xiaohongshu) | ✅ 需 X-s | ❌ | ✅ CDP 验证 ok | **ok** (1/1) |
 | 小红书 (xhs 新 UI) | ✅ 需 X-s | ❌ | ✅ CDP shadow-pierce 验证 ok | **stable 2/2** (2026-08-25) |
-| 微信视频号 (weixin) | ✅ multipart | ✅ post_create | ✅ Vue handlePost | **300002 服务端拒绝** (1/13) |
-| 抖音 (douyin) | ✅ 需 X-Bogus | ✅ | ✅ stub | **stub** (0/1) |
-| 快手 (kuaishou) | ✅ 需 sign | ✅ | ✅ CDP 端到端成功 | **ok** (1/1, 2026-08-25 19:09) |
+| 微信视频号 (weixin) | ⚠️ 300002 | ⚠️ 300002 | ✅ Wujie iframe + Vue handlePost | **ok 1/1** (2026-08-25 21:33) |
+| 抖音 (douyin) | ✅ 需 X-Bogus | ✅ | ✅ CDP 端到端成功 | **ok 1/1** (2026-08-25) |
+| 快手 (kuaishou) | ✅ 需 sign | ✅ | ✅ CDP 端到端成功 | **ok 1/1** (2026-08-25 19:09) |
+
+### 完成度：4/4 ✅ ALL PLATFORMS PUBLISHING
 
 ### 关键发现
 
-#### 微信视频号 300002 (协议层无法解决)
+#### 微信视频号 OK (2026-08-25 21:33)
 
-errCode 300002 = 服务端通用拒绝。**已验证从 page context 内部直接 fetch 也是 300002**。可能原因（**不在我们控制范围**）：
+之前 13 次 API attempts 都 errCode 300002（account-level reject，不是协议问题）。但用 **CDP + 现有 tab + Wujie iframe** 走通端到端：
+
+1. **必须复用现有 tab** — 不能 close+reopen（Wujie micro-frontend iframe mount 失效，停在 `empty.html`）
+2. `page.locator('input[type=file]')` 自动穿透 iframe → 直接 set_input_files
+3. Poll Vue `canPost` computed → 4s 后变 True（`coverUrl` 设置即触发，不依赖 fileList 数量）
+4. Fill 短标题（page-level input）+ 描述（iframe 内 `[contenteditable="true"]`）
+5. 直接调 Vue method `PostCreate.handlePost`（depth=7），**不用** DOM click（按钮被 `canPost` 阻塞）
+6. 等待 redirect 到 `/platform/post/list`
+
+最终 v2 视频发布到 list 顶部，时间戳 `2026年08月25日 21:33`。
+
+#### 微信视频号 300002 (协议层无法解决)
 - 账号未实名
 - 视频 MD5 已用过（重复上传）
 - 频率限制（24h 内发布次数超限）
