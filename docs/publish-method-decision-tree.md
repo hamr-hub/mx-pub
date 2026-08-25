@@ -31,23 +31,33 @@ result = publish("weixin", title="...", description="...", video="/path/to/v.mp4
 |------|----------|------------|---------------|---------|
 | 小红书 (xiaohongshu) | ✅ 需 X-s | ❌ | ✅ CDP 验证 ok | **ok** (1/1) |
 | 小红书 (xhs 新 UI) | ✅ 需 X-s | ❌ | ✅ CDP shadow-pierce 验证 ok | **stable 2/2** (2026-08-25) |
-| 微信视频号 (weixin) | ✅ multipart | ✅ post_create | ✅ Vue handlePost | **blocked on 300002** (1/13) |
+| 微信视频号 (weixin) | ✅ multipart | ✅ post_create | ✅ Vue handlePost | **300002 服务端拒绝** (1/13) |
 | 抖音 (douyin) | ✅ 需 X-Bogus | ✅ | ✅ stub | **stub** (0/1) |
-| 快手 (kuaishou) | ✅ 需 sign | ✅ | ✅ stub | **stub** (0/1) |
+| 快手 (kuaishou) | ✅ 需 sign | ✅ | ✅ CDP 端到端成功 | **ok** (1/1, 2026-08-25 19:09) |
 
 ### 关键发现
 
-#### 微信视频号 300002 (未解决)
+#### 微信视频号 300002 (协议层无法解决)
 
-errCode 300002 = 服务端通用拒绝。可能原因（**不在我们控制范围**）：
+errCode 300002 = 服务端通用拒绝。**已验证从 page context 内部直接 fetch 也是 300002**。可能原因（**不在我们控制范围**）：
 - 账号未实名
 - 视频 MD5 已用过（重复上传）
-- 频率限制
+- 频率限制（24h 内发布次数超限）
 - 会话过期
 - finder_id 与 session 不匹配
 
-**已验证**：body 字段、签名格式、路径都正确。即使从 page 内部直接 fetch 也是 300002。
-**结论**：账号层面的问题，**不是协议问题**。需要用户在浏览器手动点一次确认。
+**唯一能跑通的路径**：用户在浏览器手动点一次"发表"按钮确认。**协议无法绕过**。
+
+#### 快手 端到端成功 (2026-08-25 19:09)
+
+CDP 走通 `cp.kuaishou.com/article/publish/video`：
+1. `goto /article/publish/video` → 文件 input 立即可见
+2. `set_input_files(VIDEO)` → 2s 内上传完成
+3. `div[contenteditable="true"]` 填描述（含 hashtag）
+4. 点击"发布"
+5. 跳转 `/article/manage/video?status=2&from=publish` → **已发布**
+
+最终 `POST /rest/cp/works/v2/video/pc/submit?__NS_hxfalcon=...` 返回 200。详见 `scripts/_kuaishou_subagent_report.md`。
 
 #### 小红书新 UI 解决方案 (2026-08-25)
 
