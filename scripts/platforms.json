@@ -1,24 +1,23 @@
 {
-  "_comment": "Per-platform publish config. 'selectors' use CSS or @e refs from snapshot(). Keep values conservative — re-derive via `snapshot()` when a platform redesigns their creator console. See publish-workflow.md § 'Updating selectors'.",
-  "_version": 1,
-
+  "_comment": "Per-platform publish config. Selectors are MINIMAL — single CSS selector each. webbridge doesn't reliably parse complex selectors with commas or attribute substring matching. See README.md § 'Cookie / Selector 失效'.",
+  "_version": 2,
   "douyin": {
     "display_name": "抖音",
-    "publish_url": "https://creator.douyin.com/creator-micro/upload",
+    "publish_url": "https://creator.douyin.com/creator-micro/content/upload",
+    "publish_url_aliases": [
+      "https://creator.douyin.com/creator-micro/upload"
+    ],
     "login_url": "https://creator.douyin.com/",
     "supports_video": true,
     "supports_image_carousel": true,
     "selectors": {
-      "upload_input": "input[type=file][accept*='video'], input[type=file][accept*='image']",
-      "title_input": "input[placeholder*='作品标题'], .editor-title input, [contenteditable=true].title",
-      "description_input": "textarea[placeholder*='添加作品简介'], .editor-desc textarea, [contenteditable=true].desc",
-      "tag_input": "input[placeholder*='话题'], .tag-input input, [contenteditable=true].tag",
-      "tag_suggestion_first": ".topic-suggestion-item:first-child, .suggest-list li:first-child",
-      "tag_add_button": ".add-topic-btn, button:has-text('添加话题')",
-      "location_input": "input[placeholder*='添加位置'], .location-input input",
-      "cover_upload": "input[type=file][accept*='image']",
-      "publish_button": "button.publish-btn, button:has-text('发布'), .footer-publish button",
-      "draft_button": "button:has-text('存草稿')"
+      "upload_input": "input[type=file]",
+      "title_input": "input[placeholder*='作品标题']",
+      "description_input": "[contenteditable=true][data-placeholder*='作品简介']",
+      "tag_trigger": "添加话题",
+      "tag_input": "input[placeholder*='话题']",
+      "tag_suggestion_first": ".topic-suggestion-item",
+      "publish_button": "button[type='submit']"
     },
     "limits": {
       "title_max_chars": 30,
@@ -27,30 +26,45 @@
       "video_max_size_mb": 128,
       "image_max_count_per_post": 35
     },
-    "upload_settle_seconds": 8,
-    "after_publish_text_gone": "上传中",
+    "upload_settle_seconds": 6,
     "anti_spam": {
       "min_publish_interval_seconds": 120,
       "max_per_day": 30
     },
     "analytics": {
       "url": "https://creator.douyin.com/creator-micro/data-overview",
-      "url_aliases": [
-        "https://creator.douyin.com/creator-micro/data-analysis/content",
-        "https://creator.douyin.com/creator-micro/home"
-      ],
       "fields": [
-        {"key": "published_count",    "match": "作品数"},
-        {"key": "total_views",        "match": "总播放"},
-        {"key": "total_likes",        "match": "总点赞"},
-        {"key": "total_comments",     "match": "总评论"},
-        {"key": "total_shares",       "match": "总分享"},
-        {"key": "total_favorites",    "match": "总收藏"},
-        {"key": "fans_count",         "match": "粉丝数"}
+        {
+          "key": "published_count",
+          "match": "作品数"
+        },
+        {
+          "key": "total_views",
+          "match": "总播放"
+        },
+        {
+          "key": "total_likes",
+          "match": "总点赞"
+        },
+        {
+          "key": "total_comments",
+          "match": "总评论"
+        },
+        {
+          "key": "total_shares",
+          "match": "总分享"
+        },
+        {
+          "key": "total_favorites",
+          "match": "总收藏"
+        },
+        {
+          "key": "fans_count",
+          "match": "粉丝数"
+        }
       ]
     }
   },
-
   "kuaishou": {
     "display_name": "快手",
     "publish_url": "https://cp.kuaishou.com/article/publish/video",
@@ -58,16 +72,13 @@
     "supports_video": true,
     "supports_image_carousel": true,
     "selectors": {
-      "upload_input": "input[type=file][accept*='video'], input[type=file][accept*='image']",
-      "title_input": "input[placeholder*='标题'], .title-wrap input, [contenteditable=true][data-placeholder*='标题']",
-      "description_input": "textarea[placeholder*='描述'], .desc-wrap textarea, [contenteditable=true][data-placeholder*='描述']",
-      "tag_input": "input[placeholder*='话题'], .topic-input input",
-      "tag_suggestion_first": ".topic-suggest li:first-child, .topic-popup li:first-child",
-      "tag_add_button": ".add-topic, button:has-text('添加话题')",
-      "location_input": "input[placeholder*='位置'], .location input",
-      "cover_upload": "input[type=file][accept*='image']",
-      "publish_button": "button.publish, .footer-publish button, button:has-text('发布')",
-      "draft_button": "button:has-text('存草稿')"
+      "upload_input": "input[type=file]",
+      "title_input": "input[placeholder*='标题']",
+      "description_input": "[contenteditable=true][data-placeholder*='描述']",
+      "tag_trigger": "添加话题",
+      "tag_input": "input[placeholder*='话题']",
+      "tag_suggestion_first": ".topic-suggest li",
+      "publish_button": "button.publish"
     },
     "limits": {
       "title_max_chars": 30,
@@ -76,56 +87,56 @@
       "video_max_size_mb": 128,
       "image_max_count_per_post": 9
     },
-    "upload_settle_seconds": 8,
-    "after_publish_text_gone": "上传中",
+    "upload_settle_seconds": 6,
     "anti_spam": {
       "min_publish_interval_seconds": 120,
       "max_per_day": 30
     },
     "analytics": {
       "url": "https://cp.kuaishou.com/article/data-analyse/overview",
-      "url_aliases": [
-        "https://cp.kuaishou.com/article/data-analyse/content",
-        "https://cp.kuaishou.com/"
-      ],
       "fields": [
-        {"key": "published_count",    "match": "作品"},
-        {"key": "total_views",        "match": "总播放"},
-        {"key": "total_likes",        "match": "总点赞"},
-        {"key": "total_comments",     "match": "总评论"},
-        {"key": "total_favorites",    "match": "总收藏"},
-        {"key": "fans_count",         "match": "粉丝"}
+        {
+          "key": "published_count",
+          "match": "作品"
+        },
+        {
+          "key": "total_views",
+          "match": "总播放"
+        },
+        {
+          "key": "total_likes",
+          "match": "总点赞"
+        },
+        {
+          "key": "fans_count",
+          "match": "粉丝"
+        }
       ]
     }
   },
-
   "xiaohongshu": {
     "display_name": "小红书",
     "publish_url": "https://creator.xiaohongshu.com/new/home?source=official",
     "publish_url_aliases": [
       "https://creator.xiaohongshu.com/publish",
-      "https://creator.xiaohongshu.com/publish/publish-form",
-      "https://creator.xiaohongshu.com/publish/video"
+      "https://creator.xiaohongshu.com/publish/publish-form"
     ],
     "login_url": "https://creator.xiaohongshu.com/login",
     "publish_form_entry": {
       "kind": "click_after_navigate",
-      "click_selector": "button:has-text('发布视频笔记'), [aria-label*='发布视频']",
-      "wait_text": "发布笔记"
+      "click_selector": "text=发布视频笔记",
+      "wait_text": "填写标题"
     },
     "supports_video": true,
     "supports_image_carousel": true,
     "selectors": {
-      "upload_input": "input[type=file][multiple], input[type=file][accept*='video'], input[type=file][accept*='image']",
-      "title_input": "input[placeholder*='填写标题'], .title-input input, [contenteditable=true][data-placeholder*='标题']",
-      "description_input": "textarea[placeholder*='正文'], .content-input textarea, [contenteditable=true][data-placeholder*='正文']",
-      "tag_input": "input[placeholder*='话题'], .topic-input, .tag-input",
-      "tag_suggestion_first": ".topic-suggestion-item, .topic-popup li:first-child",
-      "tag_add_button": "button:has-text('添加话题')",
-      "location_input": "input[placeholder*='位置'], .location-input input",
-      "cover_upload": "input[type=file][accept*='image']",
-      "publish_button": "button.publish, button:has-text('发布'), .bottom button.primary",
-      "draft_button": "button:has-text('存草稿')"
+      "upload_input": "input[type=file]",
+      "title_input": "input[placeholder*='标题']",
+      "description_input": "[contenteditable=true][data-placeholder*='正文']",
+      "tag_trigger": "话题",
+      "tag_input": "input[placeholder*='话题']",
+      "tag_suggestion_first": ".topic-suggestion-item",
+      "publish_button": ".btn-wrapper"
     },
     "limits": {
       "title_max_chars": 20,
@@ -135,50 +146,61 @@
       "image_max_count_per_post": 9
     },
     "upload_settle_seconds": 6,
-    "after_publish_text_gone": "上传中",
     "anti_spam": {
       "min_publish_interval_seconds": 180,
       "max_per_day": 20
     },
     "analytics": {
       "url": "https://creator.xiaohongshu.com/data-board",
-      "url_aliases": [
-        "https://creator.xiaohongshu.com/new/home?source=official",
-        "https://creator.xiaohongshu.com/statistics/note"
+      "entry_clicks": [
+        "数据中心"
       ],
-      "entry_clicks": ["数据中心"],
       "fields": [
-        {"key": "published_count",    "match": "笔记数"},
-        {"key": "total_views",        "match": "曝光数"},
-        {"key": "total_likes",        "match": "点赞数"},
-        {"key": "total_comments",     "match": "评论数"},
-        {"key": "total_favorites",    "match": "收藏数"},
-        {"key": "total_shares",       "match": "分享数"},
-        {"key": "fans_count",         "match": "粉丝数"}
+        {
+          "key": "published_count",
+          "match": "笔记数"
+        },
+        {
+          "key": "total_views",
+          "match": "曝光数"
+        },
+        {
+          "key": "total_likes",
+          "match": "点赞数"
+        },
+        {
+          "key": "total_comments",
+          "match": "评论数"
+        },
+        {
+          "key": "total_favorites",
+          "match": "收藏数"
+        },
+        {
+          "key": "fans_count",
+          "match": "粉丝数"
+        }
       ]
     }
   },
-
   "weixin_channels": {
     "display_name": "视频号",
     "publish_url": "https://channels.weixin.qq.com/platform",
-    "login_url": "https://channels.weixin.qq.com/login",
     "publish_url_aliases": [
-      "https://channels.weixin.qq.com/platform/post/finder"
+      "https://channels.weixin.qq.com/platform/post/list",
+      "https://channels.weixin.qq.com/platform/post/create"
     ],
+    "login_url": "https://channels.weixin.qq.com/login",
     "supports_video": true,
     "supports_image_carousel": false,
     "selectors": {
-      "upload_input": "input[type=file][accept*='video'], input[type=file][accept*='image']",
-      "title_input": "input[placeholder*='标题'], .title-input input, [contenteditable=true][data-placeholder*='标题']",
-      "description_input": "textarea[placeholder*='描述'], .desc-wrap textarea, [contenteditable=true][data-placeholder*='描述']",
-      "tag_input": "input[placeholder*='话题'], input[placeholder*='添加话题'], .topic-input input",
-      "tag_suggestion_first": ".topic-suggest li:first-child, .topic-popup li:first-child",
-      "tag_add_button": "button:has-text('添加话题')",
-      "location_input": "input[placeholder*='位置'], input[placeholder*='添加位置']",
-      "cover_upload": "input[type=file][accept*='image']",
-      "publish_button": "button.publish, .footer-publish button, button:has-text('发表'), button:has-text('发布')",
-      "draft_button": "button:has-text('存草稿')"
+      "upload_input": "input[type=file]",
+      "title_input": "input[placeholder*='标题']",
+      "description_input": "[contenteditable=true][data-placeholder*='描述']",
+      "tag_trigger": "添加话题",
+      "tag_input": "input[placeholder*='话题']",
+      "tag_suggestion_first": ".topic-suggest li",
+      "publish_button": "button.publish"
     },
     "limits": {
       "title_max_chars": 30,
@@ -187,26 +209,33 @@
       "video_max_size_mb": 100,
       "image_max_count_per_post": 9
     },
-    "upload_settle_seconds": 8,
-    "after_publish_text_gone": "上传中",
+    "upload_settle_seconds": 6,
     "anti_spam": {
       "min_publish_interval_seconds": 180,
       "max_per_day": 20
     },
     "analytics": {
       "url": "https://channels.weixin.qq.com/platform/statistics",
-      "url_aliases": [
-        "https://channels.weixin.qq.com/platform/post/list"
+      "entry_clicks": [
+        "数据中心"
       ],
-      "entry_clicks": ["数据中心"],
       "fields": [
-        {"key": "published_count", "match": "视频数"},
-        {"key": "total_views",     "match": "总播放"},
-        {"key": "total_likes",     "match": "总点赞"},
-        {"key": "total_comments",  "match": "总评论"},
-        {"key": "total_shares",    "match": "总分享"},
-        {"key": "total_favorites", "match": "总收藏"},
-        {"key": "fans_count",      "match": "关注者"}
+        {
+          "key": "published_count",
+          "match": "视频数"
+        },
+        {
+          "key": "total_views",
+          "match": "总播放"
+        },
+        {
+          "key": "total_likes",
+          "match": "总点赞"
+        },
+        {
+          "key": "fans_count",
+          "match": "关注者"
+        }
       ]
     }
   }

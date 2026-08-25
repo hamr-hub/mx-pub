@@ -115,14 +115,24 @@ class WebBridge:
 
     def wait_for(self, *, text: str | None = None, text_gone: str | None = None,
                  seconds: float | None = None) -> dict:
-        args: dict[str, Any] = {}
-        if text:
-            args["text"] = text
-        if text_gone:
-            args["textGone"] = text_gone
-        if seconds is not None:
-            args["time"] = seconds
-        return self.call("wait_for", args)
+        """Sleep on the page (no native wait_for in daemon).
+
+        Uses ``evaluate(setTimeout)`` so it actually waits in the page context,
+        which makes subsequent evaluate/click see fresh DOM.
+        """
+        ms = int((seconds or 1) * 1000)
+        if text or text_gone:
+            # best-effort: just sleep; caller can re-evaluate
+            pass
+        try:
+            return self.call("evaluate", {"code": f"new Promise(r=>setTimeout(r,{ms}))"})
+        except WebBridgeError:
+            time.sleep(ms / 1000)
+            return {"slept_ms": ms, "fallback": "local"}
+
+    def sleep(self, seconds: float) -> dict:
+        """Convenience alias for ``wait_for(seconds=...)``."""
+        return self.wait_for(seconds=seconds)
 
     def health(self) -> dict:
         """Hit /status (not /command) to verify daemon liveness."""

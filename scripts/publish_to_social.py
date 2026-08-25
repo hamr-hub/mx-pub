@@ -418,12 +418,22 @@ class Publisher:
 
         # print a friendly prompt and wait for the user
         self.log("")
+        # enumerate session tabs so user knows which one to click
+        try:
+            tabs = self.wb.list_tabs()
+        except WebBridgeError:
+            tabs = []
         self.log(f"  ┌─ 需要你手动切 tab ─────────────────────────────────")
         self.log(f"  │  平台: {self.cfg.name} ({self.key})")
-        self.log(f"  │  把以下任一 URL 对应的 tab 切到前台:")
+        self.log(f"  │  期望前台 URL (任一即可):")
         for r in expected_roots[:3]:
             self.log(f"  │    {r}")
-        self.log(f"  │  切好后回到这里按回车继续…")
+        if tabs:
+            self.log(f"  │  当前 webbridge session 持有的 tab:")
+            for t in tabs:
+                marker = " ← 切这个" if any(t.get("url", "").startswith(r) for r in expected_roots) else ""
+                self.log(f"  │    [{t.get('tabId')}] {t.get('url','')}{marker}")
+        self.log(f"  │  在浏览器里点击匹配 tab 切到前台，再回这里按回车")
         self.log(f"  └────────────────────────────────────────────────────")
         try:
             input()
@@ -445,15 +455,45 @@ class Publisher:
         for t in own:
             if t.get("url", "").startswith(self.cfg.url.split("?")[0]):
                 self._ensure_foreground_tab()
+                self._click_publish_entry_if_needed()
                 return
         self.log(f"  · navigate → {self.cfg.url}")
         self.wb.navigate(self.cfg.url, new_tab=True, group_title=f"publish-{self.key}")
         self._ensure_foreground_tab()
+        self._click_publish_entry_if_needed()
+
+    def _click_publish_entry_if_needed(self) -> None:
+        """If config has publish_form_entry, click the entry button to navigate
+        into the actual publish form (e.g. 小红书 dashboard → 发布视频笔记).
+        """
+        entry = (self.cfg.raw.get("publish_form_entry") or {})
+        if not entry:
+            return
+        selector = entry.get("click_selector") or ""
+        if not selector:
+            return
+        # use evaluate to find element by visible text + click
+        try:
+            if selector.startswith("text="):
+                txt = selector[len("text="):]
+                js = (
+                    f"(()=>{{var el=Array.from(document.querySelectorAll('*')).find(e=>{{var t=(e.innerText||'').trim();return t==={txt!r}&&e.children.length===0;}});"
+                    f"if(el){{el.click();return 'clicked {txt}';}}return 'no_btn {txt}';}})()"
+                )
+                res = self.wb.evaluate(js).get("value", "")
+            else:
+                res = self.wb.click(selector).get("success", False)
+            self.log(f"  · entry-click: {res}")
+            self.wb.wait_for(seconds=2)
+        except WebBridgeError as e:
+            self.log(f"  · entry-click failed: {e}")
 
     def _upload(self, asset: Asset) -> None:
         sel = self.cfg.selectors.get("upload_input")
         if not sel:
             raise WebBridgeError(f"{self.key} 缺 upload_input selector")
+        # wait for page to be ready before upload (page may still be loading from navigate)
+        self.wb.wait_for(seconds=self.cfg.settle_seconds)
         self.log(f"  · upload({asset.path.name})")
         self.wb.upload(sel, [str(asset.path)])
         self.wb.wait_for(seconds=self.cfg.settle_seconds)
@@ -463,26 +503,101 @@ class Publisher:
         title = meta["title"][: int(self.cfg.limits.get("title_max_chars", 30))]
         desc = meta["description"][: int(self.cfg.limits.get("description_max_chars", 1000))]
         self.log(f"  · fill title ({len(title)} chars)")
-        self.wb.fill(s["title_input"], title)
+        self._fill_value(s["title_input"], title)
         self.log(f"  · fill desc ({len(desc)} chars)")
-        self.wb.fill(s["description_input"], desc)
+        self._fill_contenteditable(s["description_input"], desc)
         for tag in meta["tags"][: int(self.cfg.limits.get("tags_max_count", 10))]:
             self.log(f"  · tag: {tag}")
-            self.wb.fill(s["tag_input"], tag)
+            # tag input may be lazy-rendered — click the trigger ("添加话题") first
+            trigger = s.get("tag_trigger")
+            if trigger:
+                try:
+                    self.wb.evaluate(
+                        f"(()=>{{var el=Array.from(document.querySelectorAll('*')).find(e=>e.innerText==={trigger!r}&&e.children.length===0);if(el)el.click();return 'trigger='+!!el;}})()"
+                    ).get("value", "")
+                    self.wb.wait_for(seconds=0.6)
+                except WebBridgeError:
+                    pass
+            self._fill_value(s["tag_input"], tag)
             self.wb.wait_for(seconds=0.6)
-            # press Enter / click suggestion
             try:
                 self.wb.click(s["tag_suggestion_first"])
             except WebBridgeError:
                 pass
             self.wb.wait_for(seconds=0.3)
 
+    def _fill_value(self, selector: str, value: str) -> str:
+        """Fill an <input>/<textarea> via evaluate (more reliable than webbridge's
+        ``fill`` for ProseMirror-like editors). Returns the resulting value.
+        """
+        js = (
+            f"(()=>{{var el=document.querySelector({selector!r});"
+            f"if(!el)return 'no_el';"
+            f"el.focus();"
+            f"var proto=Object.getPrototypeOf(el);"
+            f"var setter=Object.getOwnPropertyDescriptor(proto,'value')?.set;"
+            f"if(setter)setter.call(el,{value!r});else el.value={value!r};"
+            f"el.dispatchEvent(new Event('input',{{bubbles:true}}));"
+            f"el.dispatchEvent(new Event('change',{{bubbles:true}}));"
+            f"return 'val='+el.value;"
+            f"}})()"
+        )
+        try:
+            res = self.wb.evaluate(js).get("value", "")
+            self.log(f"    {selector[:40]}: {res[:120]}")
+            return res
+        except WebBridgeError as e:
+            self.log(f"    {selector[:40]}: failed ({e})")
+            # fall back to webbridge fill
+            return self.wb.fill(selector, value)
+
+    def _fill_contenteditable(self, selector: str, value: str) -> None:
+        """Fill a [contenteditable=true] div via evaluate (webbridge fill only
+        supports input/textarea, not contenteditable ProseMirror-like editors).
+        """
+        js = (
+            f"(()=>{{var el=document.querySelector({selector!r});"
+            f"if(!el)return 'no_el';"
+            f"el.focus();"
+            f"var sel=window.getSelection();var range=document.createRange();"
+            f"range.selectNodeContents(el);sel.removeAllRanges();sel.addRange(range);"
+            f"var ok=document.execCommand('insertText',false,{value!r});"
+            f"if(!ok){{el.innerText={value!r};}}"
+            f"el.dispatchEvent(new InputEvent('input',{{bubbles:true,data:{value!r}}}));"
+            f"return 'ok='+ok+' len='+(el.innerText||'').length;"
+            f"}})()"
+        )
+        try:
+            res = self.wb.evaluate(js).get("value", "")
+            self.log(f"    contenteditable: {res}")
+        except WebBridgeError as e:
+            self.log(f"    contenteditable evaluate failed: {e}")
+
     def _click_publish(self) -> None:
         s = self.cfg.selectors.get("publish_button")
         if not s:
             raise WebBridgeError(f"{self.key} 缺 publish_button selector")
         self.log(f"  · click 发布")
-        self.wb.click(s)
+        # Find the submit button by selector OR by text "发布" / "发表" as fallback
+        js = (
+            "(()=>{"
+            "  var el=document.querySelector(" + repr(s) + ");"
+            "  if(!el){var all=Array.from(document.querySelectorAll('button[type=submit],button'));"
+            "    el=all.find(b=>/^发布$|^发表$/.test(b.innerText.trim()));"
+            "  }"
+            "  if(!el)return 'no_btn';"
+            "  el.scrollIntoView();el.click();"
+            "  return 'clicked='+el.innerText.trim();"
+            "})()"
+        )
+        try:
+            res = self.wb.evaluate(js).get("value", "")
+            self.log(f"    发布按钮: {res}")
+            if "no_btn" in res:
+                raise WebBridgeError(f"找不到发布按钮（selector={s}）")
+        except WebBridgeError:
+            # last resort: webbridge click
+            self.wb.click(s)
 
 
 # ---------------------------------------------------------------------------
@@ -515,15 +630,16 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--since", help="YYYYMMDD lower bound for date-segmented assets")
     ap.add_argument("--limit", type=int, default=1, help="per-platform cap (default: 1)")
     ap.add_argument("--kinds", default="video", help="video|image|both (default: video)")
-    ap.add_argument("--title-template", default="AIGC 创作 · {date}",
-                    help="supports {date} {filename} {provider} {kind}")
+    ap.add_argument("--title-template", default="今日份 · {provider}出品",
+                    help="supports {date} {filename} {provider} {kind} {yymmdd}")
     ap.add_argument("--description-template",
-                    default="AI 生成作品 · {provider} · {filename}\n#AIGC #AI创作")
-    ap.add_argument("--tags", default="AIGC,AI创作,AI绘画",
-                    help="comma/space separated")
+                    default="{filename}\n分享一个今天的作品 · {provider}")
+    ap.add_argument("--tags", default="创作,日常,分享",
+                    help="comma/space separated; **avoid** AI/模型 字眼")
     ap.add_argument("--platforms-json", default=str(DEFAULT_PLATFORMS_JSON))
     ap.add_argument("--state-db", default=str(DEFAULT_STATE_DB))
-    ap.add_argument("--session", default=None, help="webbridge session id (default: publish-<ts>)")
+    ap.add_argument("--session", default="mx-pub-main",
+                    help="webbridge session id (default: mx-pub-main, persists across runs)")
     ap.add_argument("--dry-run", action="store_true",
                     help="fill the form + screenshot, do NOT click 发布")
     ap.add_argument("--yes", action="store_true", help="skip interactive confirm")
