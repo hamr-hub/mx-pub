@@ -49,7 +49,7 @@ HERE = Path(__file__).resolve().parent
 if str(HERE) not in sys.path:
     sys.path.insert(0, str(HERE))
 
-from webbridge_client import WebBridge, WebBridgeError  # noqa: E402
+from webbridge_client import WebBridge, WebBridgeError, make_backend  # noqa: E402
 
 PROJECT_ROOT = HERE.parent
 DEFAULT_PLATFORMS_JSON = HERE / "platforms.json"
@@ -289,7 +289,7 @@ class PlatformCfg:
 
 
 class Publisher:
-    def __init__(self, key: str, cfg: PlatformCfg, wb: WebBridge, state: State,
+    def __init__(self, key: str, cfg: PlatformCfg, wb, state: State,
                  *, dry_run: bool, log=print):
         self.key = key
         self.cfg = cfg
@@ -297,6 +297,7 @@ class Publisher:
         self.state = state
         self.dry_run = dry_run
         self.log = log
+        self.backend_name = "cdp" if wb.__class__.__name__ == "WebBridgeCdp" else "webbridge"
 
     # ---- guards ---------------------------------------------------------
 
@@ -385,14 +386,20 @@ class Publisher:
     def _ensure_foreground_tab(self) -> None:
         """Make sure the user's foreground tab is on this platform's publish URL.
 
-        webbridge's evaluate/click/snapshot/upload only operate on the user's
-        foreground tab (find_tab sets a session-side 'current' pointer that
-        ``evaluate`` ignores). So we ask the user to switch tabs.
-
-        Set ``MX_PUB_AUTO_FOREGROUND=1`` (or pass ``--auto-foreground``) to
-        instead navigate the foreground tab — useful in headless / CI but
-        disruptive for the user.
+        With CDP backend, this just switches the session's current Page to the
+        matching one (no foreground dance). With webbridge backend, prompts
+        the user to switch tabs since ``evaluate`` only runs on foreground.
         """
+        if self.backend_name == "cdp":
+            target = self.cfg.url.split("?")[0]
+            aliases = [a.split("?")[0] for a in (self.cfg.raw.get("publish_url_aliases") or [])]
+            for u in [target] + aliases:
+                hit = self.wb.find_tab(u, active=False)
+                if hit:
+                    return
+            self.wb.navigate(self.cfg.url, new_tab=True, group_title=f"publish-{self.key}")
+            return
+
         expected_roots = [self.cfg.url.split("?")[0]] + (self.cfg.raw.get("publish_url_aliases") or [])
         expected_roots = [r for r in expected_roots if r]
         try:
@@ -522,6 +529,9 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--yes", action="store_true", help="skip interactive confirm")
     ap.add_argument("--auto-foreground", action="store_true",
                     help="navigate the user's foreground tab (set MX_PUB_AUTO_FOREGROUND=1)")
+    ap.add_argument("--backend", choices=("auto", "cdp", "webbridge", "cdp-only"), default="auto",
+                    help="auto = try CDP then fall back to webbridge (default); "
+                         "cdp-only = require Playwright/CDP; webbridge = use kimi-webbridge only")
     ap.add_argument("--health", action="store_true", help="only print daemon + config status, exit 0")
     args = ap.parse_args(argv)
 
@@ -589,7 +599,8 @@ def main(argv: list[str] | None = None) -> int:
             return 1
 
     state = State(Path(args.state_db))
-    wb = WebBridge(session=args.session)
+    prefer = "auto" if args.backend == "auto" else args.backend
+    wb, backend_name = make_backend(prefer=prefer, session=args.session, verbose=True)
 
     summary = {}
     cursor = 0

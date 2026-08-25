@@ -7,7 +7,47 @@
 - [Kimi WebBridge](https://github.com/MoonshotAI/kimi-webbridge) 浏览器扩展 + 本地 daemon
   （让 AI 控制真实 Chrome，复用你的登录态）
 - `python3` (>= 3.10)
-- 持续运行中的 Chrome，**前台 tab** 切到对应平台（详见 [运行模式](#运行模式)）
+- 持续运行中的 Chrome
+- 可选 [Playwright](https://playwright.dev/python/)（`pip install playwright && playwright install chromium`）—— 启用**后台模式**
+
+---
+
+## 后台 / 前台双模式（自动选择）
+
+mx-pub 默认同时支持**真后台**（Playwright + CDP）和**前台协作**（webbridge）。
+**默认行为**：`--backend auto` → 先试 CDP（Chrome debug port 9222），通了就用 Playwright
+后台模式；不通则降级到 webbridge 前台协作（你需要手动切 4 次 tab）。
+
+| 模式 | 触发条件 | 切 tab 次数 | 浏览器要求 |
+|------|----------|-------------|----------|
+| **后台 CDP** | Chrome 启了 `--remote-debugging-port=9222` | **0** | Chrome 重启 + debug port |
+| **前台 webbridge** | 降级默认 | 4（每平台 1 次） | 任意 Chrome |
+
+强制选择：
+
+```bash
+./scripts/publish_douyin.sh                                # auto（默认）
+python scripts/publish_to_social.py --backend cdp-only ... # 强制后台，失败报错
+python scripts/publish_to_social.py --backend webbridge ...# 强制前台
+```
+
+**手动启用后台模式**（一次性）：
+
+```bash
+# 1. 完全退出 Chrome（Cmd+Q），然后启动带 debug port
+/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome \
+    --remote-debugging-port=9222 \
+    --remote-allow-origins=* \
+    > ~/logs/chrome-debug.log 2>&1 &
+
+# 2. 验证
+curl http://127.0.0.1:9222/json/version    # 应返回 Chrome 版本
+
+# 3. 跑 mx-pub — 会自动用 Playwright 后台模式
+./scripts/publish_douyin.sh --asset 20260819/minimax/video_1.mp4
+```
+
+如果不想重启 Chrome，保持 `--backend auto`（默认）就行，每次跑会切 4 次 tab。
 
 ---
 
@@ -43,7 +83,12 @@ mx-pub/
 
 ## 运行模式
 
-**前台协作模式（默认）**：脚本每跳到一个新平台，会检测 Chrome 前台 tab 的 URL。
+**auto（默认）** —— 脚本先探测 `http://127.0.0.1:9222`（Chrome debug port）：
+
+- **通了** → 用 Playwright `connect_over_cdp` 后台跑（无需切 tab）
+- **不通** → 用 Kimi WebBridge，**每个平台让你切一次 tab**
+
+**前台协作（降级路径）**：脚本每跳到一个新平台，会检测 Chrome 前台 tab 的 URL。
 若不在目标平台的 publish 页，就打印
 
 ```
@@ -60,9 +105,7 @@ mx-pub/
 **自动前台（headless / CI 友好）**：加 `--auto-foreground` 或 `MX_PUB_AUTO_FOREGROUND=1`，
 脚本会直接把前台 tab 导航到 publish URL，**但会打断你当前看的内容**。
 
-**真后台（CDP 直连，需要 Chrome 重启）**：见 [docs/background-mode.md](docs/background-mode.md)。
-需要 Chrome 启动时加 `--remote-debugging-port=9222`，然后脚本用 Playwright `connect_over_cdp`
-绑定后台 tab。**当前未实现**，因为用户的 Chrome 没启 debug port。
+**真后台（CDP 直连）**：见 [docs/background-mode.md](docs/background-mode.md)。
 
 ---
 
