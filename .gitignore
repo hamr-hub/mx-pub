@@ -1,0 +1,29 @@
+# Runtime state (本地 SQLite，记录发布历史)
+scripts/publish_state.db
+scripts/publish_state.db-journal
+
+# Generated snapshots / reports
+_benchmark/stats/*_dryrun.png
+_benchmark/stats/*.json
+_benchmark/stats/REPORT_*.md
+
+# Logs
+logs/
+*.log
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+.venv/
+venv/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
