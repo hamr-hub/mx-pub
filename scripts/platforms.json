@@ -105,22 +105,33 @@
     },
     "analytics": {
       "url": "https://cp.kuaishou.com/article/data-analyse/overview",
+      "url_aliases": [
+        "https://cp.kuaishou.com/profile"
+      ],
       "fields": [
         {
           "key": "published_count",
-          "match": "作品"
+          "match": "最新作品"
         },
         {
           "key": "total_views",
-          "match": "总播放"
+          "match": "播放量"
         },
         {
           "key": "total_likes",
-          "match": "总点赞"
+          "match": "点赞量"
+        },
+        {
+          "key": "total_comments",
+          "match": "评论量"
+        },
+        {
+          "key": "total_shares",
+          "match": "分享量"
         },
         {
           "key": "fans_count",
-          "match": "粉丝"
+          "match": "净增粉丝量"
         }
       ]
     }
