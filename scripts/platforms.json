@@ -69,16 +69,26 @@
     "display_name": "快手",
     "publish_url": "https://cp.kuaishou.com/article/publish/video",
     "login_url": "https://cp.kuaishou.com/",
+    "publish_form_entry": {
+      "kind": "click_after_upload",
+      "upload_continuation_prompt": "继续编辑",
+      "click_selector": "text=继续编辑",
+      "wait_text": "作品描述"
+    },
     "supports_video": true,
     "supports_image_carousel": true,
     "selectors": {
       "upload_input": "input[type=file]",
-      "title_input": "input[placeholder*='标题']",
-      "description_input": "[contenteditable=true][data-placeholder*='描述']",
-      "tag_trigger": "添加话题",
-      "tag_input": "input[placeholder*='话题']",
-      "tag_suggestion_first": ".topic-suggest li",
-      "publish_button": "button.publish"
+      "title_input": "[contenteditable=true][class*='title']",
+      "description_input": "[contenteditable=true]._description_17g9x_24",
+      "smart_copy_trigger": "智能文案",
+      "smart_tag_trigger": "智能话题",
+      "smart_title_trigger": "智能推荐标题",
+      "smart_cover_trigger": "智能推荐封面",
+      "tag_input": ".ant-select-selection-search-input",
+      "tag_suggestion_first": ".ant-select-item-option",
+      "publish_button": "button.publish, .footer-publish button, button:has-text('发布')",
+      "draft_button": "button:has-text('存草稿')"
     },
     "limits": {
       "title_max_chars": 30,
@@ -87,7 +97,8 @@
       "video_max_size_mb": 128,
       "image_max_count_per_post": 9
     },
-    "upload_settle_seconds": 6,
+    "upload_settle_seconds": 10,
+    "post_upload_settle_seconds": 20,
     "anti_spam": {
       "min_publish_interval_seconds": 120,
       "max_per_day": 30
@@ -132,11 +143,13 @@
     "selectors": {
       "upload_input": "input[type=file]",
       "title_input": "input[placeholder*='标题']",
-      "description_input": "[contenteditable=true][data-placeholder*='正文']",
+      "description_input": ".tiptap.ProseMirror",
+      "smart_title_trigger": "智能标题",
+      "smart_cover_trigger": "智能推荐封面",
       "tag_trigger": "话题",
       "tag_input": "input[placeholder*='话题']",
       "tag_suggestion_first": ".topic-suggestion-item",
-      "publish_button": ".btn-wrapper"
+      "publish_button": ".btn-wrapper .btn-inner"
     },
     "limits": {
       "title_max_chars": 20,

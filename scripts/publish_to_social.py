@@ -502,22 +502,27 @@ class Publisher:
         s = self.cfg.selectors
         title = meta["title"][: int(self.cfg.limits.get("title_max_chars", 30))]
         desc = meta["description"][: int(self.cfg.limits.get("description_max_chars", 1000))]
+
+        # optional: use platform's smart title button (fills AI-generated title)
+        if s.get("smart_title_trigger") and not title:
+            self._smart_button(s["smart_title_trigger"])
+
         self.log(f"  · fill title ({len(title)} chars)")
         self._fill_value(s["title_input"], title)
         self.log(f"  · fill desc ({len(desc)} chars)")
         self._fill_contenteditable(s["description_input"], desc)
+
+        # optional: use platform's smart copy to auto-generate description
+        # (only when desc is empty or template is simple — let AI improve it)
+        if s.get("smart_copy_trigger") and len(desc) < 20:
+            self._smart_button(s["smart_copy_trigger"], wait_after=20)
+
         for tag in meta["tags"][: int(self.cfg.limits.get("tags_max_count", 10))]:
             self.log(f"  · tag: {tag}")
-            # tag input may be lazy-rendered — click the trigger ("添加话题") first
+            # tag input may be lazy-rendered — click the trigger ("添加话题" / "话题") first
             trigger = s.get("tag_trigger")
             if trigger:
-                try:
-                    self.wb.evaluate(
-                        f"(()=>{{var el=Array.from(document.querySelectorAll('*')).find(e=>e.innerText==={trigger!r}&&e.children.length===0);if(el)el.click();return 'trigger='+!!el;}})()"
-                    ).get("value", "")
-                    self.wb.wait_for(seconds=0.6)
-                except WebBridgeError:
-                    pass
+                self._smart_button(trigger, wait_after=0.6)
             self._fill_value(s["tag_input"], tag)
             self.wb.wait_for(seconds=0.6)
             try:
@@ -525,6 +530,27 @@ class Publisher:
             except WebBridgeError:
                 pass
             self.wb.wait_for(seconds=0.3)
+
+        # optional: use platform's smart tag generator (replaces manual tags)
+        if s.get("smart_tag_trigger"):
+            self._smart_button(s["smart_tag_trigger"], wait_after=20)
+
+    def _smart_button(self, text: str, *, wait_after: float = 1.0) -> str:
+        """Click a button by its visible text (e.g. 智能文案, 智能话题, 智能推荐标题)."""
+        js = (
+            f"(()=>{{var el=Array.from(document.querySelectorAll('button,[role=button],div[role=button],span[role=button],a[role=button]')).find(b=>{{var t=(b.innerText||'').trim();return t==={text!r}&&b.children.length<=2;}});"
+            f"if(!el){{var el2=Array.from(document.querySelectorAll('*')).find(b=>(b.innerText||'').trim()==={text!r}&&b.children.length===0);el=el2;}}"
+            f"if(!el)return 'no_btn';el.click();return 'clicked '+{text!r};}})()"
+        )
+        try:
+            res = self.wb.evaluate(js).get("value", "")
+            self.log(f"  · smart-btn {text}: {res}")
+            if wait_after > 0:
+                self.wb.wait_for(seconds=wait_after)
+            return res
+        except WebBridgeError as e:
+            self.log(f"  · smart-btn {text} failed: {e}")
+            return ""
 
     def _fill_value(self, selector: str, value: str) -> str:
         """Fill an <input>/<textarea> via evaluate (more reliable than webbridge's
