@@ -70,7 +70,9 @@ def parse_number(s: str) -> float | None:
 
 
 def extract_field(page_text: str, keyword: str) -> str | None:
-    """Find the FIRST number that comes IMMEDIATELY after `keyword` (within 30 chars)."""
+    """Find the FIRST number that comes IMMEDIATELY after `keyword` (within 30 chars).
+    Filters out user IDs that look like "username1529" (numbers appended to text without separator).
+    """
     idx = page_text.find(keyword)
     if idx < 0:
         return None
