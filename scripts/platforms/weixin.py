@@ -58,7 +58,7 @@ def publish_via_browser(*, title, description, video, topics=None, location=None
 
         # Upload via outer-page file input
         try:
-            page.locator("input[type=file]").first.set_input_files(video, timeout=60000)
+            page.locator("input[type=file]").first.set_input_files(video, timeout=60000, no_wait_after=True)
         except Exception as e:
             return PublishResult("weixin", "fail", method="cdp", error=f"upload: {e}")
 
