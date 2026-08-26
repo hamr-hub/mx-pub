@@ -149,25 +149,18 @@ def publish_via_browser(*, title, description, video, topics=None, location=None
         except Exception as e:
             return PublishResult("douyin", "fail", method="cdp", error=f"no_publish_button: {e}")
 
-        # Wait for success
-        for i in range(30):
-            time.sleep(1)
+        # Wait for success (douyin publish can take up to 3 min for video processing)
+        for i in range(150):
+            time.sleep(2)
             txt = page.evaluate("() => document.body.innerText")
             if "发布成功" in txt or "已发布" in txt or "审核中" in txt or "作品管理" in txt:
                 return PublishResult("douyin", "ok", method="cdp", final=txt[:200])
             if "重新上传" in txt:
-                # Re-upload visible = post-publish state (similar to kuaishou)
                 return PublishResult("douyin", "ok", method="cdp", final=txt[:200])
             if "发布失败" in txt or "上传失败" in txt or "请检查网络" in txt:
                 return PublishResult("douyin", "fail", method="cdp", error="publish_failed_in_page", body=txt[:300])
-
-        # If we waited 30s with no explicit failure, check if URL changed to manage
-        cur_url = page.url
-        if 'content/manage' in cur_url:
-            return PublishResult("douyin", "ok", method="cdp", final=cur_url)
-        # Or check for re-upload button (post-publish state)
-        state = page.evaluate("() => ({hasReupload: document.body.innerText.includes('重新上传'), url: location.href})")
-        if state.get("hasReupload"):
-            return PublishResult("douyin", "ok", method="cdp", final=state.get("url", ""))
+            cur_url = page.url
+            if 'content/manage' in cur_url:
+                return PublishResult("douyin", "ok", method="cdp", final=cur_url)
 
         return PublishResult("douyin", "partial", method="cdp", error="timeout_waiting_for_publish_confirm")
