@@ -115,30 +115,21 @@ def publish_via_browser(*, title, description, video, topics=None, location=None
             pass
 
         # Find and click the actual publish button
-        # NOTE 2026-08-25: New xhs UI uses a different publish flow:
-        # - Old URL: /publish/short-video-from-local (had working xhs-publish-btn with leaf text)
-        # - New URL: /publish/publish?from=menu&target=video (xhs-publish-btn is empty custom element)
-        # The new URL needs the menu flow (note-manager → click 发布笔记 → upload from there)
+        # NOTE 2026-08-26: New xhs UI structure:
+        # - <xhs-publish-btn> is a custom-element PLACEHOLDER with no rendered children
+        # - The real visible button is OUTSIDE the placeholder, in regular DOM:
+        #   div.btn-wrapper > div.btn-inner containing text "发布笔记"
+        # - Clicking xhs-publish-btn triggers Vue preview state but doesn't submit
         clicked = page.evaluate("""(() => {
-            // The bottom red 发布 button is inside xhs-publish-btn shadow DOM
-            const xpb = document.querySelector('xhs-publish-btn');
-            if (!xpb) return 'no_xpb';
-
-            // Look for the leaf text "发布" inside the custom element
-            const all = Array.from(xpb.querySelectorAll('*'));
-            for (const e of all) {
-                if ((e.innerText || '').trim() === '发布' && e.children.length === 0) {
-                    e.click();
-                    return 'clicked_text';
-                }
-            }
-            // Old path fallback: query the real button
-            const submitBtn = xpb.querySelector('button.submit, .submit-btn');
-            if (submitBtn) { submitBtn.click(); return 'clicked_submit'; }
-            return 'no_btn_found';
+            const wrapper = document.querySelector('.btn-wrapper');
+            if (!wrapper) return 'no_btn_wrapper';
+            const inner = wrapper.querySelector('.btn-inner');
+            if (!inner) return 'no_btn_inner';
+            inner.click();
+            return 'clicked_btn_inner';
         })()""")
 
-        if "no" in clicked:
+        if clicked != 'clicked_btn_inner':
             return PublishResult("xhs", "fail", method="cdp", error=f"no_publish_button: {clicked}")
 
         # Wait for upload to complete
