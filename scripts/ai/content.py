@@ -146,14 +146,168 @@ def _parse_json_response(text: str) -> Optional[dict]:
     return None
 
 
-def _fallback_content(video_path: str, platform: str) -> dict:
-    """Deterministic placeholder content when no AI is available."""
-    name = Path(video_path).stem.replace("_", " ").replace("-", " ")
-    title = name[:TITLE_LIMITS.get(platform, 30)]
+def _extract_keywords_from_name(name: str) -> list[str]:
+    """Extract candidate keywords from video filename."""
+    # Common keywords mapping for visual themes
+    keyword_map = {
+        "lightning": ["#lightning", "#storm"],
+        "storm": ["#storm", "#weather"],
+        "thunder": ["#thunder", "#storm"],
+        "manhattan": ["#nyc", "#city"],
+        "skyline": ["#skyline", "#city"],
+        "tokyo": ["#tokyo", "#japan", "#street"],
+        "shibuya": ["#tokyo", "#shibuya", "#night"],
+        "car": ["#car", "#drift"],
+        "drift": ["#drift", "#car", "#night"],
+        "sports": ["#car", "#racing"],
+        "luxury": ["#luxury", "#car"],
+        "samurai": ["#samurai", "#cinematic", "#duel"],
+        "duel": ["#duel", "#cinematic", "#samurai"],
+        "bamboo": ["#bamboo", "#forest", "#cinematic"],
+        "rain": ["#rain", "#cinematic"],
+        "cinematic": ["#cinematic", "#film"],
+        "cherry": ["#sakura", "#cherry", "#kyoto", "#timelapse"],
+        "blossom": ["#sakura", "#cherry"],
+        "timelapse": ["#timelapse", "#nature"],
+        "kyoto": ["#kyoto", "#japan"],
+        "butterfly": ["#butterfly", "#macro", "#nature"],
+        "monarch": ["#butterfly", "#macro"],
+        "macro": ["#macro", "#nature"],
+        "aurora": ["#aurora", "#northern", "#night"],
+        "iceland": ["#iceland", "#aurora", "#cabin"],
+        "cabin": ["#cabin", "#aurora"],
+        "astronaut": ["#space", "#mars", "#astronaut"],
+        "mars": ["#mars", "#space"],
+        "tiger": ["#tiger", "#wildlife", "#jungle"],
+        "wildlife": ["#wildlife", "#nature"],
+        "hummingbird": ["#hummingbird", "#wildlife", "#macro"],
+        "hibiscus": ["#flower", "#nature"],
+        "campfire": ["#campfire", "#fire", "#night", "#mountain"],
+        "mountain": ["#mountain", "#nature"],
+        "fire": ["#fire", "#campfire"],
+        "ember": ["#fire", "#night"],
+        "corals": ["#ocean", "#coral"],
+        "underwater": ["#ocean", "#underwater"],
+        "biolumines": ["#ocean", "#underwater"],
+        "angels": ["#temple", "#ancient"],
+        "angkor": ["#temple", "#ancient"],
+        "maple": ["#japan", "#autumn", "#kyoto"],
+        "autumn": ["#autumn", "#fall"],
+        "temple": ["#temple", "#ancient", "#asia"],
+        "warrior": ["#samurai", "#warrior"],
+    }
+
+    lower = name.lower()
+    found = []
+    seen = set()
+    for key, tags in keyword_map.items():
+        if key in lower and not any(t in seen for t in tags):
+            for t in tags:
+                if t not in seen:
+                    found.append(t)
+                    seen.add(t)
+            if len(found) >= 4:
+                break
+    return found[:5]
+
+
+def _read_prompt_for_video(video_path: str) -> Optional[str]:
+    """Look up the topic_seed for this video in prompts.csv.
+
+    Walks up to find a prompts.csv in the same directory. Matches by filename.
+    """
+    import csv
+    import re
+    p = Path(video_path)
+    candidates = [p.parent / "prompts.csv", p.parent.parent / "prompts.csv"]
+    filename = p.name
+    for csv_path in candidates:
+        if not csv_path.exists():
+            continue
+        try:
+            with open(csv_path, encoding="utf-8") as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    file_path = row.get("file_path", "")
+                    if file_path.endswith(filename) or filename in file_path:
+                        seed = row.get("topic_seed", "").strip()
+                        if seed:
+                            return seed
+        except Exception:
+            continue
+    return None
+
+
+def _heuristic_content(video_path: str, platform: str) -> dict:
+    """Heuristic content generation when no AI API is available.
+
+    Reads topic_seed from prompts.csv for actual descriptive content.
+    Better than pure deterministic placeholder.
+    """
+    seed = _read_prompt_for_video(video_path) or ""
+
+    title_limit = TITLE_LIMITS.get(platform, 30)
+    platform_emojis = {
+        "xhs": ["✨", "🌸", "💫", "🌟", "🌈", "💖"],
+        "xiaohongshu": ["✨", "🌸", "💫"],
+        "douyin": ["🔥", "⚡", "💥", "🎬"],
+        "kuaishou": ["👍", "❤️", "💪"],
+        "weixin": [],
+        "weixin_channels": [],
+    }
+    emojis = platform_emojis.get(platform, [""])
+
+    import re as _re
+    if not seed:
+        # Fallback: extract from filename
+        name = Path(video_path).stem
+        title_words = _re.sub(r'^video\s*\d+\s*', '', name.replace("_", " ").replace("-", " "),
+                             flags=_re.IGNORECASE).strip() or "精彩瞬间"
+    else:
+        # Extract first descriptive phrase (before comma or up to 40 chars)
+        title_words = seed.split(",")[0].strip()
+        # Remove leading cinematic/editorial fluff for shorter titles
+        for fluff in ["cinematic", "editorial", "photorealistic", "8K", "4K", "high dynamic range", "macro time-collapse"]:
+            title_words = _re.sub(rf'^{fluff}\s+', '', title_words, flags=_re.IGNORECASE)
+
+    if platform in ("weixin", "weixin_channels"):
+        title = title_words[:title_limit]
+    elif platform in ("xhs", "xiaohongshu"):
+        title = f"{emojis[0]} {title_words}"[:title_limit].strip()
+    elif platform == "douyin":
+        title = f"{title_words} {emojis[0]}"[:title_limit].strip()
+    else:
+        title = title_words[:title_limit]
+
+    # Hashtags from seed keywords
+    hashtags = _extract_keywords_from_name(seed + " " + Path(video_path).stem)
+    if not hashtags:
+        hashtags = [f"#{platform}", "#video", "#share"]
+
+    # Description: use topic_seed (truncated) with platform style
+    if seed:
+        # Take first 2 clauses
+        clauses = seed.split(",")
+        description = ", ".join(clauses[:3]).strip()[:200]
+    else:
+        description = title_words
+
+    style_suffix = {
+        "xhs": "～ 喜欢吗？",
+        "xiaohongshu": "～ 喜欢吗？",
+        "douyin": " 完整看更震撼🔥",
+        "kuaishou": " 老铁双击👍",
+        "weixin": "",
+        "weixin_channels": "",
+    }.get(platform, "")
+
+    if style_suffix:
+        description = (description + style_suffix)[:500]
+
     return {
         "title": title,
-        "description": f"AI-generated video: {name}",
-        "hashtags": ["#video", "#share"],
+        "description": description,
+        "hashtags": [h.lstrip("#") for h in hashtags],
     }
 
 
@@ -233,8 +387,8 @@ def generate_content(video_path: str, platform: str = "xhs",
         }
         return result
 
-    # Fallback to deterministic content
-    return _fallback_content(video_path, platform)
+    # Fallback to heuristic content (smarter than pure deterministic placeholder)
+    return _heuristic_content(video_path, platform)
 
 
 def batch_generate(video_paths: list[str], platform: str, **kwargs) -> dict[str, dict]:
