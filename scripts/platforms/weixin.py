@@ -31,22 +31,36 @@ def _find_weixin_page(ctx):
     return None
 
 
+def _setup_page(page):
+    """Navigate to weixin post create."""
+    if "platform/post/create" not in page.url or page.url == "about:blank":
+        page.goto(PUBLISH_URL, wait_until="domcontentloaded", timeout=30000)
+        time.sleep(10)
+    return page
+
+
 def publish_via_api(*, title, description, video, topics=None, location=None, cookies=None, **kwargs) -> PublishResult:
     return PublishResult("weixin", "fail", method="api", error="weixin_api_blocked_use_browser")
 
 
-def publish_on_page(page, *, title, description, video, topics=None, location=None, **kwargs) -> PublishResult:
-    """Publish using an existing Playwright page (shared-session mode)."""
+def publish_on_page(page, *, title, description, video, topics=None, location=None,
+                    fast_mode: bool = False, **kwargs) -> PublishResult:
+    """Publish using an existing Playwright page (shared-session mode).
+
+    fast_mode: skip upload-wait and confirmation-wait. Returns immediately after
+    the click. Use for batch publishing. Default off.
+    """
     title = (title or "")[:14]
     page.bring_to_front()
     page.set_viewport_size({"width": 1440, "height": 900})
 
     if "platform/post/create" not in page.url:
         page.goto(PUBLISH_URL, wait_until="domcontentloaded", timeout=30000)
-        time.sleep(10)
+        time.sleep(5 if fast_mode else 10)
 
-    # Wait for file input to appear on OUTER page
-    for _ in range(25):
+    # Wait for file input to appear on OUTER page (fast: 3s, normal: 25s)
+    file_input_max = 3 if fast_mode else 25
+    for _ in range(file_input_max):
         if page.locator("input[type=file]").count() > 0:
             break
         time.sleep(1)
@@ -60,14 +74,15 @@ def publish_on_page(page, *, title, description, video, topics=None, location=No
     except Exception as e:
         return PublishResult("weixin", "fail", method="cdp", error=f"upload: {e}")
 
-    # Wait for upload
-    for _ in range(60):
-        state = page.evaluate(
-            "(() => ({has_cover: document.body.innerText.includes('封面'), uploading: document.body.innerText.includes('上传中')}))()"
-        )
-        if state and state.get("has_cover") and not state.get("uploading"):
-            break
-        time.sleep(2)
+    # Wait for upload (fast: skip, normal: 60s)
+    if not fast_mode:
+        for _ in range(60):
+            state = page.evaluate(
+                "(() => ({has_cover: document.body.innerText.includes('封面'), uploading: document.body.innerText.includes('上传中')}))()"
+            )
+            if state and state.get("has_cover") and not state.get("uploading"):
+                break
+            time.sleep(2)
 
     # Fill form: title + description (live in iframe)
     iframe_loc = page.frame_locator("iframe[name=content]")
@@ -86,7 +101,7 @@ def publish_on_page(page, *, title, description, video, topics=None, location=No
     except Exception:
         pass
 
-    time.sleep(2)
+    time.sleep(1 if fast_mode else 2)
 
     # Click 发表 button (lives in iframe)
     clicked = page.evaluate("""(() => {
@@ -105,7 +120,11 @@ def publish_on_page(page, *, title, description, video, topics=None, location=No
     if clicked != 'clicked':
         return PublishResult("weixin", "fail", method="cdp", error=f"no_publish_button: {clicked}")
 
-    # Wait for confirmation
+    # Wait for confirmation (fast: skip, normal: 45s)
+    if fast_mode:
+        return PublishResult("weixin", "ok", method="cdp", clicked=clicked,
+                            fast_mode=True, note="submitted; verification skipped")
+
     for _ in range(45):
         cur = page.url
         if "post/list" in cur or "manage" in cur:

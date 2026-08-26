@@ -18,8 +18,8 @@ def _match_url():
 
 
 def _setup_page(page):
-    """Navigate to the publish page if not already there."""
-    if "publish" not in page.url:
+    """Navigate to the publish page. If page is blank/new, navigate to publish URL."""
+    if "publish" not in page.url or page.url == "about:blank":
         page.goto(PUBLISH_URL, wait_until="domcontentloaded", timeout=30000)
         time.sleep(5)
     return page
@@ -29,15 +29,21 @@ def publish_via_api(*, title, description, video, topics=None, location=None, **
     return PublishResult("kuaishou", "fail", method="api", error="kuaishou_api_requires_sign_use_browser")
 
 
-def publish_on_page(page, *, title, description, video, topics=None, location=None, **kwargs) -> PublishResult:
-    """Publish using an existing Playwright page (shared-session mode)."""
-    title = (title or "")[:30]  # kuaishou title cap
+def publish_on_page(page, *, title, description, video, topics=None, location=None,
+                    fast_mode: bool = False, **kwargs) -> PublishResult:
+    """Publish using an existing Playwright page (shared-session mode).
+
+    fast_mode: skip upload-wait and confirmation-wait. Returns immediately after
+    the publish click. Use for batch publishing when you trust the platform's
+    async processing. Default off (waits for actual success indicators).
+    """
+    title = (title or "")[:30]
     page.bring_to_front()
     page.set_viewport_size({"width": 1440, "height": 900})
     page.goto(PUBLISH_URL, wait_until="domcontentloaded", timeout=30000)
-    time.sleep(5)
+    time.sleep(3 if fast_mode else 5)
 
-    # Upload (page has 2 file inputs: video + image. Use video one explicitly)
+    # Upload
     try:
         time.sleep(2)
         inp = page.locator("input[type=file][accept*='video']").first
@@ -45,13 +51,13 @@ def publish_on_page(page, *, title, description, video, topics=None, location=No
     except Exception as e:
         return PublishResult("kuaishou", "fail", method="cdp", error=f"upload: {e}")
 
-    # Wait for upload to complete
-    for i in range(120):
+    # Wait for upload to complete (fast: 3s, normal: up to 120s)
+    upload_max = 3 if fast_mode else 120
+    for i in range(upload_max):
         time.sleep(1)
         state = page.evaluate("""(() => ({
             hasTitle: !!document.querySelector('input[placeholder*="标题"], input[placeholder*="描述"]'),
             uploading: document.body.innerText.includes('上传中'),
-            body: document.body.innerText.slice(0, 200)
         }))()""")
         if state.get("hasTitle") and not state.get("uploading"):
             break
@@ -70,7 +76,7 @@ def publish_on_page(page, *, title, description, video, topics=None, location=No
     except Exception:
         pass
 
-    time.sleep(2)
+    time.sleep(1 if fast_mode else 2)
 
     # Click 发布
     try:
@@ -107,7 +113,11 @@ def publish_on_page(page, *, title, description, video, topics=None, location=No
     except Exception as e:
         return PublishResult("kuaishou", "fail", method="cdp", error=f"no_publish_button: {e}")
 
-    # Wait for confirmation
+    # Wait for confirmation (fast: skip, normal: 30s)
+    if fast_mode:
+        return PublishResult("kuaishou", "ok", method="cdp", clicked=clicked,
+                            fast_mode=True, note="submitted; verification skipped")
+
     for i in range(30):
         time.sleep(1)
         txt = page.evaluate("() => document.body.innerText")

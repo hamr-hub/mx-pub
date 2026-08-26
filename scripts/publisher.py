@@ -137,62 +137,178 @@ def _find_page(ctx, platform, mod):
     return None
 
 
-def publish_all(platforms, video, *, cdp_url=None, inter_delay_s=2) -> dict:
+# Errors that indicate a transient condition (retry with backoff may help)
+TRANSIENT_ERROR_PATTERNS = (
+    "timeout 20000ms exceeded",
+    "timeout 15000ms exceeded",
+    "timeout 10000ms exceeded",
+    "target page, context or browser has been closed",
+    "browser has been closed",
+    "connection closed",
+    "navigation interrupted",
+    "page crashed",
+    "set_input_files",
+    "no_weixin_tab",
+    "no_douyin_tab",
+    "no_kuaishou_tab",
+    "no_xhs_tab",
+    "no_editor_after_navigate",
+)
+
+
+def is_transient_error(err: str) -> bool:
+    """Whether an error message suggests the operation might succeed on retry."""
+    if not err:
+        return False
+    err_lower = err.lower()
+    return any(pat in err_lower for pat in TRANSIENT_ERROR_PATTERNS)
+
+
+def _find_file_input(page, prefer_video=True):
+    """Find a file input on the page using multiple fallback selectors.
+
+    Tries selectors in order:
+    1. Video file input by accept='video' (most common pattern)
+    2. File input by accept containing common video extensions (.mp4, .mov)
+    3. Any visible file input
+    4. First file input (last resort)
+
+    Returns Playwright locator or None if no input found.
+    """
+    selectors = []
+    if prefer_video:
+        selectors += [
+            "input[type=file][accept*='video']",
+            "input[type=file][accept*='.mp4']",
+            "input[type=file][accept*='.mov']",
+            "input[type=file][accept*='.flv']",
+        ]
+    selectors.append("input[type=file]")
+
+    for sel in selectors:
+        loc = page.locator(sel).first
+        try:
+            if loc.count() > 0:
+                return loc
+        except Exception:
+            continue
+    return None
+
+
+def _connect_chrome(cdp_url, max_attempts=3, base_backoff_s=5):
+    """Connect to Chrome CDP with retry. Returns (browser, context) or raises."""
+    from playwright.sync_api import sync_playwright
+
+    last_err = None
+    for attempt in range(max_attempts):
+        try:
+            p = sync_playwright().start()
+            browser = p.chromium.connect_over_cdp(cdp_url, timeout=20000)
+            ctx = browser.contexts[0]
+            return p, browser, ctx
+        except Exception as e:
+            last_err = e
+            if attempt < max_attempts - 1:
+                wait = base_backoff_s * (2 ** attempt)  # 5s, 10s, 20s
+                print(f"  [chrome] connect failed (attempt {attempt+1}/{max_attempts}), "
+                      f"retrying in {wait}s: {str(e)[:100]}")
+                time.sleep(wait)
+            try:
+                p.stop()
+            except Exception:
+                pass
+    raise RuntimeError(f"chrome_connect_failed after {max_attempts} attempts: {last_err}")
+
+
+def publish_all(platforms, video, *, cdp_url=None, inter_delay_s=2,
+                retry_transient=True, retry_max=2) -> dict:
     """Publish one video to multiple platforms using ONE shared Playwright session.
 
-    This is the recommended path for batch workflows — avoids Chrome CDP
-    timeout errors from creating 4+ Playwright sessions in rapid succession.
-
     Args:
-        platforms: list of platform names (e.g. ["xhs", "douyin", "kuaishou", "weixin"])
-        video: dict with keys: path, title, description, hashtags
-        cdp_url: Chrome DevTools Protocol URL (default localhost:9222)
-        inter_delay_s: seconds to wait between platforms
+        platforms: list of platform names
+        video: dict with path, title, description, hashtags
+        cdp_url: Chrome DevTools Protocol URL
+        inter_delay_s: seconds between platforms
+        retry_transient: retry on transient errors (CDP timeout, etc.)
+        retry_max: max retry attempts per platform
 
     Returns:
         dict mapping platform name to PublishResult
     """
-    from playwright.sync_api import sync_playwright
-
     cdp_url = cdp_url or CDP_URL_DEFAULT
     results = {}
 
-    with sync_playwright() as p:
-        browser = p.chromium.connect_over_cdp(cdp_url, timeout=20000)
-        ctx = browser.contexts[0]
+    try:
+        p, browser, ctx = _connect_chrome(cdp_url)
+    except Exception as e:
+        # Connection failed entirely — return fail for all platforms
+        for platform in platforms:
+            result = PublishResult(platform, "fail", method="cdp", error=f"chrome_connect: {str(e)[:150]}")
+            track(platform, result)
+            results[platform] = result
+        return results
 
+    try:
         for i, platform in enumerate(platforms):
             if i > 0:
                 time.sleep(inter_delay_s)
             mod = _get_module(platform)
 
-            t0 = time.time()
-            try:
-                page = _find_page(ctx, platform, mod)
-                if page is None:
-                    # Fallback: create a new tab and let the module navigate it
-                    page = ctx.new_page()
-                page.bring_to_front()
-                if hasattr(mod, "_setup_page"):
-                    page = mod._setup_page(page) or page
-                if hasattr(mod, "publish_on_page"):
-                    result = mod.publish_on_page(
-                        page,
-                        title=video.get("title", ""),
-                        description=video.get("description", ""),
-                        video=video["path"],
-                        topics=video.get("hashtags", []),
-                    )
-                    result.method = result.method or "cdp"
-                else:
-                    result = PublishResult(platform, "fail", method="cdp", error="no_publish_on_page_in_module")
-                result.duration_s = time.time() - t0
-                track(platform, result)
-                results[platform] = result
-            except Exception as e:
-                result = PublishResult(platform, "fail", method="cdp", error=str(e)[:200])
-                result.duration_s = time.time() - t0
-                track(platform, result)
-                results[platform] = result
+            attempts = 0
+            last_result = None
+            while True:
+                attempts += 1
+                t0 = time.time()
+                try:
+                    page = _find_page(ctx, platform, mod)
+                    if page is None:
+                        page = ctx.new_page()
+                    page.bring_to_front()
+                    if hasattr(mod, "_setup_page"):
+                        page = mod._setup_page(page) or page
+                    if hasattr(mod, "publish_on_page"):
+                        result = mod.publish_on_page(
+                            page,
+                            title=video.get("title", ""),
+                            description=video.get("description", ""),
+                            video=video["path"],
+                            topics=video.get("hashtags", []),
+                        )
+                        result.method = result.method or "cdp"
+                    else:
+                        result = PublishResult(platform, "fail", method="cdp",
+                                              error="no_publish_on_page_in_module")
+                    result.duration_s = time.time() - t0
+                    last_result = result
+                    # Retry on transient errors
+                    if (retry_transient and result.status != "ok"
+                            and is_transient_error(result.error)
+                            and attempts <= retry_max):
+                        wait = 5 * (2 ** (attempts - 1))
+                        print(f"  [{platform}] transient error, retry {attempts}/{retry_max} in {wait}s: "
+                              f"{result.error[:80]}")
+                        time.sleep(wait)
+                        continue
+                    break
+                except Exception as e:
+                    err = str(e)[:200]
+                    last_result = PublishResult(platform, "fail", method="cdp", error=err)
+                    last_result.duration_s = time.time() - t0
+                    if (retry_transient and is_transient_error(err)
+                            and attempts <= retry_max):
+                        wait = 5 * (2 ** (attempts - 1))
+                        print(f"  [{platform}] exception (transient), retry {attempts}/{retry_max} in {wait}s: "
+                              f"{err[:80]}")
+                        time.sleep(wait)
+                        continue
+                    break
+
+            track(platform, last_result)
+            results[platform] = last_result
+    finally:
+        try:
+            p.stop()
+        except Exception:
+            pass
 
     return results

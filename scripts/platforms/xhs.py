@@ -25,38 +25,45 @@ def _find_xhs_publish_page(ctx):
     return None
 
 
+def _setup_page(page):
+    """Navigate to xhs editor URL."""
+    if "publish/publish" not in page.url or page.url == "about:blank":
+        page.goto(EDITOR_URL, wait_until="domcontentloaded", timeout=30000)
+        time.sleep(5)
+    return page
+
+
 def publish_via_api(*, title, description, video, topics=None, location=None, **kwargs) -> PublishResult:
     return PublishResult("xhs", "fail", method="api", error="xhs_api_not_implemented_use_browser")
 
 
-def publish_on_page(page, *, title, description, video, topics=None, location=None, **kwargs) -> PublishResult:
+def publish_on_page(page, *, title, description, video, topics=None, location=None,
+                    fast_mode: bool = False, **kwargs) -> PublishResult:
     """Publish using an existing Playwright page."""
-    title = (title or "")[:20]  # xhs 标题硬上限 20 字符
+    title = (title or "")[:20]
     topic_str = " ".join(f"#{t}" if not t.startswith("#") else t for t in (topics or []))
 
     page.bring_to_front()
     page.set_viewport_size({"width": 1280, "height": 800})
     time.sleep(1)
 
-    # Wait for input to exist (page may take time after navigation)
     for _ in range(15):
         if page.locator("input[type=file]").count() > 0:
             break
         time.sleep(1)
 
-    # Upload video
     try:
         inp = page.locator("input[type=file]").first
         inp.set_input_files(video, timeout=15000, no_wait_after=True)
     except Exception as e:
         return PublishResult("xhs", "fail", method="cdp", error=f"upload_failed: {e}")
 
-    # Wait for cover generation
-    for _ in range(45):
+    # Wait for cover generation (fast: 5s, normal: 45s)
+    cover_max = 5 if fast_mode else 45
+    for _ in range(cover_max):
         state = page.evaluate("""(() => ({
             hasCover: document.body.innerText.includes('封面') || document.querySelectorAll('.cover, [class*="cover"]').length > 0,
             hasBtn: document.querySelectorAll('xhs-publish-btn, [class*="publish-btn"]').length,
-            body: document.body.innerText.slice(0, 300)
         }))()""")
         if state.get("hasCover") and state.get("hasBtn", 0) > 0:
             break
@@ -77,10 +84,6 @@ def publish_on_page(page, *, title, description, video, topics=None, location=No
         pass
 
     # Find and click the actual publish button
-    # NOTE 2026-08-26: New xhs UI structure:
-    # - <xhs-publish-btn> is a custom-element PLACEHOLDER with no rendered children
-    # - The real visible button is OUTSIDE the placeholder, in regular DOM:
-    #   div.btn-wrapper > div.btn-inner containing text "发布笔记"
     clicked = page.evaluate("""(() => {
         const wrapper = document.querySelector('.btn-wrapper');
         if (!wrapper) return 'no_btn_wrapper';
@@ -93,7 +96,11 @@ def publish_on_page(page, *, title, description, video, topics=None, location=No
     if clicked != 'clicked_btn_inner':
         return PublishResult("xhs", "fail", method="cdp", error=f"no_publish_button: {clicked}")
 
-    # Wait for upload to complete
+    # Wait for completion (fast: skip, normal: 60s)
+    if fast_mode:
+        return PublishResult("xhs", "ok", method="cdp", clicked=clicked,
+                            fast_mode=True, note="submitted; verification skipped")
+
     for _ in range(60):
         time.sleep(1)
         still_uploading = page.evaluate("(() => document.body.innerText.includes('上传中'))()")

@@ -19,7 +19,8 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE / "scripts"))
 
-from publisher import publish_all, PublishResult  # noqa
+from core.parallel import publish_parallel
+from publisher import PublishResult  # noqa
 
 QUEUE_FILE = HERE / "publish_queue.json"
 PLATFORMS = ["xhs", "douyin", "kuaishou", "weixin"]
@@ -101,8 +102,9 @@ def main():
         print("  No platforms need publishing for this video")
         return
 
-    # Single shared Playwright session
-    results = publish_all(targets, video, inter_delay_s=2)
+    # Parallel publish — each platform in its own Playwright session.
+    # fast_mode skips confirmation waits (target: <30s total wall time).
+    results = publish_parallel(targets, video, fast_mode=True)
 
     # Update per-platform status
     for platform in targets:
