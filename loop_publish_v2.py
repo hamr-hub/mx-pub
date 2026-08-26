@@ -20,7 +20,15 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE / "scripts"))
 
 from core.parallel import publish_parallel
+from core.environment import ensure_chrome, get_env_summary
 from publisher import PublishResult  # noqa
+
+# Optional: AI content generation (uses Claude/OpenAI/Ollama if configured)
+try:
+    from ai.content import generate_content
+    AI_AVAILABLE = True
+except Exception:
+    AI_AVAILABLE = False
 
 QUEUE_FILE = HERE / "publish_queue.json"
 PLATFORMS = ["xhs", "douyin", "kuaishou", "weixin"]
@@ -75,8 +83,16 @@ def result_to_dict(result: PublishResult) -> dict:
 
 
 def main():
+    env = get_env_summary()
+    print(f"🌍 Environment: {env['platform']}, headless={env['is_headless']}")
+    print(f"   AI providers: {env['ai_providers']}")
+    if env["cdp_url"]:
+        print(f"   Chrome CDP: {env['cdp_url']}")
+    else:
+        print(f"   Chrome CDP: will auto-launch")
+
     queue = load_queue()
-    print(f"Total: {queue['total']}, Published: {queue['published']}, Remaining: {queue['remaining']}")
+    print(f"📋 Queue: {queue['total']} total, {queue['published']} done, {queue['remaining']} remaining")
 
     video = pick_next_unposted(queue)
     if not video:
@@ -102,9 +118,22 @@ def main():
         print("  No platforms need publishing for this video")
         return
 
+    # Auto-detect / launch Chrome (works in any environment)
+    env = get_env_summary()
+    cdp_url = ensure_chrome(
+        headless=env["is_headless"],
+    )
+    print(f"  env: headless={env['is_headless']} cdp={cdp_url}")
+
+    # AI content generation (optional): regenerate title/description per platform
+    # Uses Claude/OpenAI/Ollama if API keys are set in env.
+    # Otherwise falls back to pre-defined content in publish_queue.json.
+    if AI_AVAILABLE and any(env["ai_providers"].values()):
+        print(f"  🤖 AI content generation enabled: {env['ai_providers']}")
+
     # Parallel publish — each platform in its own Playwright session.
     # fast_mode skips confirmation waits (target: <30s total wall time).
-    results = publish_parallel(targets, video, fast_mode=True)
+    results = publish_parallel(targets, video, cdp_url=cdp_url, fast_mode=True)
 
     # Update per-platform status
     for platform in targets:
