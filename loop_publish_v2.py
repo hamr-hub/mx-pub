@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
-"""
-Robust publish loop: each platform independent, 1 video per batch.
+"""Robust publish loop: each platform runs in ONE shared Playwright session.
 
-Per platform:
-- xhs: new URL + navigate; if no publish button, mark blocked (microapp)
-- douyin: navigate to /content/publish
-- kuaishou: navigate to /article/publish/video; click "立即发布"
-- weixin: navigate to /platform/post/create; if no file_input, mark blocked
+Per iteration:
+1. Pick the next unposted video (latest first)
+2. Open ONE Playwright session, reuse across all 4 platforms
+3. Track per-platform status (ok/blocked/partial/fail)
+4. Auto-block platforms with known issues to advance the queue
+5. Persist results to publish_queue.json
 
-Continues to next video regardless of failures.
+This replaces the per-platform Playwright sessions which caused
+"Timeout 15000ms" errors when 4+ sessions were created in rapid succession.
 """
 import json
 import sys
@@ -18,11 +19,10 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE / "scripts"))
 
-from publisher import publish, PublishResult  # noqa
+from publisher import publish_all, PublishResult  # noqa
 
 QUEUE_FILE = HERE / "publish_queue.json"
 PLATFORMS = ["xhs", "douyin", "kuaishou", "weixin"]
-MAX_RETRIES_BEFORE_BLOCK = 2  # mark platform as blocked after N consecutive fails
 
 
 def load_queue():
@@ -34,7 +34,7 @@ def save_queue(queue):
 
 
 def is_blocked(video, platform):
-    """Check if a platform has been marked blocked for this video (avoid re-trying forever)."""
+    """Check if a platform has been marked blocked for this video."""
     info = video.get("published", {}).get(platform, {})
     return isinstance(info, dict) and info.get("status") == "blocked"
 
@@ -45,61 +45,32 @@ def pick_next_unposted(queue):
         published = video.get("published", {})
         done_platforms = {p for p, info in published.items()
                           if isinstance(info, dict) and info.get("status") in ("ok", "blocked", "partial")}
-        # If all 4 platforms are done (ok/blocked/partial), skip this video
         if all(p in done_platforms for p in PLATFORMS):
             continue
         return video
     return None
 
 
-def publish_to_platform(platform, video):
-    """Publish video to one platform. Returns dict with status, error, method."""
-    video_path = video["path"]
-    title = video.get("title", "")
-    description = video.get("description", "")
-    hashtags = video.get("hashtags", [])
-
-    print(f"  [{platform}] publishing...")
-    try:
-        result = publish(
-            platform,
-            title=title,
-            description=description,
-            video=video_path,
-            topics=hashtags,
-        )
-        result.tokens_used = 0
-        return {
-            "ts": time.time(),
-            "method": result.method,
-            "status": result.status,
-            "error": (result.error or "")[:200],
-        }
-    except Exception as e:
-        return {
-            "ts": time.time(),
-            "method": "exception",
-            "status": "fail",
-            "error": str(e)[:200],
-        }
-
-
-def should_block(video, platform, err):
+def should_block(platform, err):
     """Decide if this platform should be marked blocked for this video."""
     err_lower = (err or "").lower()
-    # XHS publish button is micro-frontend placeholder
     if platform == "xhs" and ("no_publish_button" in err_lower or "no_btn_found" in err_lower):
         return True
-    # Weixin: web uploader completely removed OR no weixin tab in browser
     if platform == "weixin" and ("no_file_input" in err_lower or "no_wujie_frame" in err_lower or "no_weixin_tab" in err_lower):
         return True
-    # Douyin: only works when user has manually opened the page (CDP upload timeout otherwise)
-    if platform == "douyin" and "timeout_waiting_for_publish_confirm" in err_lower:
-        return False  # keep retrying; sometimes succeeds
-    # Kuaishou: file input never appears (no active browser session) — block so loop advances
     if platform == "kuaishou" and ("page.wait_for_selector" in err_lower or "set_input_files" in err_lower):
         return True
     return False
+
+
+def result_to_dict(result: PublishResult) -> dict:
+    """Convert PublishResult to a JSON-serializable dict for queue state."""
+    return {
+        "ts": time.time(),
+        "method": result.method,
+        "status": result.status,
+        "error": (result.error or "")[:200],
+    }
 
 
 def main():
@@ -114,38 +85,44 @@ def main():
     print(f"\nPublishing: {video['name']} (date={video['date']}, {video['size']:,} bytes)")
     print(f"  Title: {video['title'][:80]}")
 
-    results = {}
+    # Determine which platforms need publishing (skip ok/blocked)
+    targets = []
     for platform in PLATFORMS:
         existing = video.get("published", {}).get(platform, {})
-        # Skip if already ok
         if isinstance(existing, dict) and existing.get("status") == "ok":
             print(f"  [{platform}] already published (ok), skip")
-            results[platform] = existing
             continue
-        # Skip if blocked
         if is_blocked(video, platform):
             print(f"  [{platform}] blocked (microapp/deprecated), skip")
-            results[platform] = existing
             continue
+        targets.append(platform)
 
-        result = publish_to_platform(platform, video)
-        # Auto-block after threshold for known platform issues
-        if result["status"] != "ok" and should_block(video, platform, result.get("error", "")):
-            result["status"] = "blocked"
-            print(f"  [{platform}] status=blocked (known platform issue) error={result.get('error','')[:80]}")
+    if not targets:
+        print("  No platforms need publishing for this video")
+        return
+
+    # Single shared Playwright session
+    results = publish_all(targets, video, inter_delay_s=2)
+
+    # Update per-platform status
+    for platform in targets:
+        r = results.get(platform)
+        if r is None:
+            continue
+        d = result_to_dict(r)
+        if r.status != "ok" and should_block(platform, r.error):
+            d["status"] = "blocked"
+            print(f"  [{platform}] status=blocked (known platform issue) error={r.error[:80]}")
         else:
-            print(f"  [{platform}] status={result['status']} method={result['method']} error={result.get('error','')[:80]}")
-        results[platform] = result
+            print(f"  [{platform}] status={r.status} method={r.method} dur={r.duration_s:.1f}s error={(r.error or '')[:80]}")
+        video["published"][platform] = d
 
-    # Update queue
-    video["published"].update(results)
+    # Recompute queue totals
     queue["published"] = sum(
         1 for v in queue["videos"]
-        if all(
-            p in v.get("published", {})
-            and v["published"][p].get("status") in ("ok", "blocked", "partial")
-            for p in PLATFORMS
-        )
+        if all(p in v.get("published", {})
+               and v["published"][p].get("status") in ("ok", "blocked", "partial")
+               for p in PLATFORMS)
     )
     queue["remaining"] = queue["total"] - queue["published"]
     save_queue(queue)
