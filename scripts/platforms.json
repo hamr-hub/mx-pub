@@ -1,0 +1,67 @@
+{
+  "_version": 3,
+  "_comment": "Per-platform config: URLs + selectors + analytics field keywords. Used by stats.py.",
+  "douyin": {
+    "display_name": "抖音",
+    "publish_url": "https://creator.douyin.com/creator-micro/content/upload",
+    "login_url": "https://creator.douyin.com/",
+    "analytics": {
+      "url": "https://creator.douyin.com/creator-micro/home",
+      "fields": [
+        {"key": "total_views",    "match": "播放量"},
+        {"key": "total_likes",    "match": "获赞"},
+        {"key": "fans_count",     "match": "粉丝"},
+        {"key": "total_comments", "match": "作品评论"},
+        {"key": "total_shares",   "match": "作品分享"},
+        {"key": "home_visits",    "match": "主页访问量"}
+      ]
+    }
+  },
+  "kuaishou": {
+    "display_name": "快手",
+    "publish_url": "https://cp.kuaishou.com/article/publish/video",
+    "login_url": "https://cp.kuaishou.com/",
+    "analytics": {
+      "url": "https://cp.kuaishou.com/article/data-analyse/overview",
+      "url_aliases": ["https://cp.kuaishou.com/profile"],
+      "fields": [
+        {"key": "total_views",    "match": "播放量"},
+        {"key": "total_likes",    "match": "点赞量"},
+        {"key": "total_comments", "match": "评论量"},
+        {"key": "total_shares",   "match": "分享量"},
+        {"key": "fans_count",     "match": "净增粉丝量"}
+      ]
+    }
+  },
+  "xiaohongshu": {
+    "display_name": "小红书",
+    "publish_url": "https://creator.xiaohongshu.com/new/home?source=official",
+    "login_url": "https://creator.xiaohongshu.com/login",
+    "analytics": {
+      "url": "https://creator.xiaohongshu.com/data-board",
+      "fields": [
+        {"key": "published_count", "match": "笔记数"},
+        {"key": "total_views",     "match": "曝光数"},
+        {"key": "total_likes",     "match": "点赞数"},
+        {"key": "total_comments",  "match": "评论数"},
+        {"key": "total_favorites", "match": "收藏数"},
+        {"key": "fans_count",      "match": "粉丝数"}
+      ]
+    }
+  },
+  "weixin_channels": {
+    "display_name": "视频号",
+    "publish_url": "https://channels.weixin.qq.com/platform/post/create",
+    "login_url": "https://channels.weixin.qq.com/login",
+    "analytics": {
+      "url": "https://channels.weixin.qq.com/platform/statistics",
+      "entry_clicks": ["数据中心"],
+      "fields": [
+        {"key": "published_count", "match": "视频数"},
+        {"key": "total_views",     "match": "总播放"},
+        {"key": "total_likes",     "match": "总点赞"},
+        {"key": "fans_count",      "match": "关注者"}
+      ]
+    }
+  }
+}
