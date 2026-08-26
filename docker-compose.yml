@@ -1,0 +1,30 @@
+version: '3.8'
+services:
+  publisher:
+    build: .
+    container_name: mx-pub
+    restart: unless-stopped
+    environment:
+      # AI providers (set whichever you have)
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - OLLAMA_HOST=${OLLAMA_HOST:-}
+      # Force mock AI if no provider configured
+      - MOCK_AI=${MOCK_AI:-0}
+      # Headless mode
+      - HEADLESS=1
+      - CHROME_PATH=/usr/bin/google-chrome
+    volumes:
+      # Mount videos directory
+      - /Users/hyx/ssd/codespace/personal/images:/videos:ro
+      # Persist Chrome profile
+      - chrome-profile:/tmp/chrome-profile
+      # Persist publish state
+      - ./publish_state.json:/app/publish_state.json
+      - ./publish_queue.json:/app/publish_queue.json
+      - ./scripts/_benchmark:/app/scripts/_benchmark
+    # Network mode: host gives Chrome CDP local access
+    network_mode: host
+
+volumes:
+  chrome-profile:

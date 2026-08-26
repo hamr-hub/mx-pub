@@ -125,6 +125,101 @@ def _call_ollama(prompt: str, system: str = "", model: str = "llama3.2") -> str:
         raise RuntimeError(f"ollama: {e}")
 
 
+def _call_mock(prompt: str, system: str = "", model: str = "mock") -> str:
+    """Mock AI provider for testing. Generates platform-appropriate content
+    deterministically from prompts.csv topic_seed. Set MOCK_AI=1 to enable.
+
+    This proves the full code path works without needing real API keys.
+    """
+    import re as _re
+
+    # Extract filename and platform style
+    m = _re.search(r"视频文件名: ([^\n]+)", prompt)
+    filename = m.group(1).strip() if m else ""
+    m = _re.search(r"平台风格: ([^\n]+)", prompt)
+    style = m.group(1).strip() if m else ""
+    m = _re.search(r"标题字数限制: (\d+)", prompt)
+    title_limit = int(m.group(1)) if m else 30
+
+    # Try to find the actual video file and look up prompts.csv
+    video_path = None
+    # Filename may be just the name; check the images dir
+    candidate_dirs = [
+        Path("/Users/hyx/ssd/codespace/personal/images"),
+        Path("~/ssd/codespace/personal/images").expanduser(),
+    ]
+    for base in candidate_dirs:
+        if not base.exists():
+            continue
+        for found in base.glob(f"**/{filename}"):
+            video_path = str(found)
+            break
+        if video_path:
+            break
+
+    # Get the real descriptive content from prompts.csv
+    if video_path:
+        seed = _read_prompt_for_video(video_path) or ""
+    else:
+        seed = ""
+
+    if seed:
+        # Use first descriptive phrase (before comma) as title
+        title_words = seed.split(",")[0].strip()
+        # Strip leading fluff
+        for fluff in ["cinematic", "editorial", "photorealistic", "8K", "4K", "high dynamic range"]:
+            title_words = _re.sub(rf'^{fluff}\s+', '', title_words, flags=_re.IGNORECASE)
+    else:
+        name = Path(filename).stem if filename else "video"
+        title_words = _re.sub(r'^video\s*\d+\s*', '', name.replace("_", " ").replace("-", " "),
+                             flags=_re.IGNORECASE).strip() or "精彩视频"
+
+    # Style-driven descriptions
+    if "文艺" in style:
+        description = f"{title_words}的每一帧都美到窒息～ 忍不住循环播放✨"
+    elif "douyin" in style.lower() or "抖音" in style:
+        description = f"{title_words}！前2秒就让人移不开眼🔥"
+    elif "kuaishou" in style.lower() or "快手" in style:
+        description = f"老铁们看这个{title_words}，太真实了👍"
+    elif "正式" in style or "weixin" in style.lower():
+        description = title_words
+    else:
+        description = title_words
+
+    # Keyword extraction from seed
+    keywords_map = {
+        "lightning": "lightning", "storm": "storm", "thunder": "thunder",
+        "manhattan": "nyc", "tokyo": "tokyo", "shibuya": "shibuya",
+        "car": "car", "drift": "drift", "luxury": "luxury",
+        "samurai": "samurai", "duel": "duel", "rain": "rain",
+        "cherry": "sakura", "blossom": "sakura", "timelapse": "timelapse",
+        "kyoto": "kyoto", "butterfly": "butterfly", "macro": "macro",
+        "aurora": "aurora", "iceland": "iceland", "campfire": "campfire",
+        "fire": "fire", "mountain": "mountain", "tiger": "tiger",
+        "wildlife": "wildlife", "hummingbird": "hummingbird",
+        "underwater": "ocean", "ocean": "ocean", "coral": "ocean",
+        "angkor": "temple", "temple": "temple",
+        "neon": "cyberpunk", "cyberpunk": "cyberpunk",
+        "samurai": "samurai",
+    }
+    tags = []
+    seen = set()
+    haystack = (seed + " " + title_words).lower()
+    for k, v in keywords_map.items():
+        if k in haystack and v not in seen:
+            tags.append(v)
+            seen.add(v)
+    if not tags:
+        tags = ["video", "share"]
+    tags = tags[:5]
+
+    return json.dumps({
+        "title": title_words[:title_limit],
+        "description": description,
+        "hashtags": tags,
+    }, ensure_ascii=False)
+
+
 def _parse_json_response(text: str) -> Optional[dict]:
     """Parse JSON from AI response (may be wrapped in markdown)."""
     text = text.strip()
@@ -327,7 +422,9 @@ def generate_content(video_path: str, platform: str = "xhs",
     """
     # Auto-detect provider
     if not provider:
-        if os.environ.get("ANTHROPIC_API_KEY"):
+        if os.environ.get("MOCK_AI") in ("1", "true", "yes"):
+            provider = "mock"
+        elif os.environ.get("ANTHROPIC_API_KEY"):
             provider = "claude"
         elif os.environ.get("OPENAI_API_KEY"):
             provider = "openai"
@@ -372,6 +469,8 @@ def generate_content(video_path: str, platform: str = "xhs",
         except Exception as e:
             print(f"  [ai] Ollama failed: {e}, falling back")
             text = ""
+    elif provider == "mock":
+        text = _call_mock(prompt, system="你是短视频发布专家，输出必须是合法 JSON。")
     else:
         text = ""
 
