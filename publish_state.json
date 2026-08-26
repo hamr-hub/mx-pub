@@ -10,122 +10,51 @@
       "last_updated": 1787654068.953729
     },
     "weixin": {
-      "attempts": 68,
-      "successes": 32,
+      "attempts": 70,
+      "successes": 34,
       "last_status": "ok",
       "methods": {
-        "cdp": 65,
+        "cdp": 67,
         "api": 2,
         "api_capture": 1
       },
-      "last_updated": 1787726643.789811,
+      "last_updated": 1787727081.515427,
       "total_tokens": 22348
     },
     "xhs": {
-      "attempts": 54,
-      "successes": 31,
+      "attempts": 56,
+      "successes": 32,
       "methods": {
-        "cdp": 54
+        "cdp": 56
       },
       "last_status": "ok",
-      "last_updated": 1787726646.694776,
+      "last_updated": 1787727032.177077,
       "total_tokens": 9000
     },
     "douyin": {
-      "attempts": 59,
-      "successes": 33,
+      "attempts": 61,
+      "successes": 35,
       "total_tokens": 1175,
       "last_status": "ok",
       "methods": {
         "api": 1,
-        "cdp": 58
+        "cdp": 60
       },
-      "last_updated": 1787726658.3701
+      "last_updated": 1787727082.00049
     },
     "kuaishou": {
-      "attempts": 50,
-      "successes": 35,
+      "attempts": 51,
+      "successes": 36,
       "total_tokens": 1032,
       "last_status": "ok",
       "methods": {
         "api": 1,
-        "cdp": 49
+        "cdp": 50
       },
-      "last_updated": 1787726694.672222
+      "last_updated": 1787727013.104173
     }
   },
   "history": [
-    {
-      "ts": 1787721591.583022,
-      "platform": "weixin",
-      "status": "ok",
-      "method": "cdp",
-      "duration_s": 141.61,
-      "error": null,
-      "final": "https://channels.weixin.qq.com/platform/post/list",
-      "tokens_used": 0
-    },
-    {
-      "ts": 1787721887.0237498,
-      "platform": "weixin",
-      "status": "ok",
-      "method": "cdp",
-      "duration_s": 144.18,
-      "error": null,
-      "final": "https://channels.weixin.qq.com/platform/post/list",
-      "tokens_used": 0
-    },
-    {
-      "ts": 1787722322.661933,
-      "platform": "douyin",
-      "status": "ok",
-      "method": "cdp",
-      "duration_s": 19.76,
-      "error": null,
-      "final": "作品发布\n首页\n内容管理\n数据中心\n收入变现\n创作服务\n首页\nAI分身\nAI工坊\n内容管理\n作品 (54)\n作品合集\n全部\n已发布\n审核中\n未通过\n体裁\n全部\n所有时间\n导出数据\n00:06\nlightning storm time\n编辑作品\n设置权限\n作品置顶\n删除作品\n2026年08月26日 13:15\n已发布\n播放\n1\n点赞\n0\n评论\n0\n分享\n0\n收藏\n0\n完播率\n100%\n2秒跳出率\n0",
-      "tokens_used": 0
-    },
-    {
-      "ts": 1787722492.078232,
-      "platform": "kuaishou",
-      "status": "ok",
-      "method": "cdp",
-      "duration_s": 167.4,
-      "error": null,
-      "final": "https://cp.kuaishou.com/article/publish/video",
-      "tokens_used": 0
-    },
-    {
-      "ts": 1787722896.279696,
-      "platform": "xhs",
-      "status": "ok",
-      "method": "cdp",
-      "duration_s": 3.18,
-      "error": null,
-      "clicked": "clicked_btn_inner",
-      "final": "创作服务平台\n何永先\n发布笔记\n首页\n笔记管理\nBuilder hub\n小工具\nRed Skill\n数据看板\n活动中心\n笔记灵感\n创作学院\n创作百科\n收起侧边栏\n视频文件\n重新上传\nvideo_2.mp4\n检测为高清视频。清晰的画面能极大提升观看体验，有利于提升观看时长\n设置封面\nPK封面\n默认截取第一帧作为封面，优质的封面会吸引更多人浏览笔记\n优质封面示例\n设置封面\n遇到问题?\n智能推荐封面\n智",
-      "tokens_used": 0
-    },
-    {
-      "ts": 1787722916.360148,
-      "platform": "douyin",
-      "status": "ok",
-      "method": "cdp",
-      "duration_s": 18.07,
-      "error": null,
-      "final": "作品发布\n首页\n内容管理\n数据中心\n收入变现\n创作服务\n首页\nAI分身\nAI工坊\n内容管理\n作品 (55)\n作品合集\n全部\n已发布\n审核中\n未通过\n体裁\n全部\n所有时间\n导出数据\n加载中…\n发布成功",
-      "tokens_used": 0
-    },
-    {
-      "ts": 1787723051.452883,
-      "platform": "kuaishou",
-      "status": "ok",
-      "method": "cdp",
-      "duration_s": 133.08,
-      "error": null,
-      "final": "4\n先爷\n发布作品\n首页\n内容管理\n互动管理\n数据中心\n成长中心\n创作服务\n其他服务\n发布视频\n作品描述\ntimelapse of cherry blossoms blooming and falling in Kyoto zen garden, soft wind, stone lantern static in foreground, 4K high dynamic range, 10s co",
-      "tokens_used": 0
-    },
     {
       "ts": 1787723193.61924,
       "platform": "weixin",
@@ -1199,6 +1128,87 @@
       "status": "ok",
       "method": "cdp",
       "duration_s": 55.18,
+      "error": null,
+      "clicked": "clicked_primary",
+      "fast_mode": true,
+      "note": "submitted; verification skipped",
+      "tokens_used": 0
+    },
+    {
+      "ts": 1787726946.5791428,
+      "platform": "douyin",
+      "status": "ok",
+      "method": "cdp",
+      "duration_s": 25.87,
+      "error": null,
+      "clicked": "clicked_primary",
+      "fast_mode": true,
+      "note": "submitted; verification skipped",
+      "tokens_used": 0
+    },
+    {
+      "ts": 1787726968.27731,
+      "platform": "weixin",
+      "status": "ok",
+      "method": "cdp",
+      "duration_s": 47.58,
+      "error": null,
+      "clicked": "clicked",
+      "fast_mode": true,
+      "note": "submitted; verification skipped",
+      "tokens_used": 0
+    },
+    {
+      "ts": 1787727007.776169,
+      "platform": "xhs",
+      "status": "fail",
+      "method": "cdp",
+      "duration_s": 57.31,
+      "error": "upload_failed: Locator.set_input_files: Timeout 15000ms exceeded.\nCall log:\n  - waiting for locator(\"input[type=file]\").first\n    - locator resolved to <input type=\"file\" data-v-05013878=\"\" class=\"upload-input\" accept=\".mp4,.mov,.flv,.f4v,.mkv,.rm,.rmvb,.m4v,.mpg,.mpeg,.ts\"/>\n",
+      "tokens_used": 0
+    },
+    {
+      "ts": 1787727013.104173,
+      "platform": "kuaishou",
+      "status": "ok",
+      "method": "cdp",
+      "duration_s": 92.41,
+      "error": null,
+      "clicked": "clicked_primary",
+      "fast_mode": true,
+      "note": "submitted; verification skipped",
+      "tokens_used": 0
+    },
+    {
+      "ts": 1787727032.177079,
+      "platform": "xhs",
+      "status": "ok",
+      "method": "cdp",
+      "duration_s": 11.12,
+      "error": null,
+      "clicked": "clicked_btn_inner",
+      "fast_mode": true,
+      "note": "submitted; verification skipped",
+      "tokens_used": 0
+    },
+    {
+      "ts": 1787727081.515427,
+      "platform": "weixin",
+      "status": "ok",
+      "method": "cdp",
+      "duration_s": 23.87,
+      "error": null,
+      "clicked": "clicked",
+      "fast_mode": true,
+      "note": "submitted; verification skipped",
+      "tokens_used": 0
+    },
+    {
+      "ts": 1787727082.00049,
+      "platform": "douyin",
+      "status": "ok",
+      "method": "cdp",
+      "duration_s": 24.35,
       "error": null,
       "clicked": "clicked_primary",
       "fast_mode": true,

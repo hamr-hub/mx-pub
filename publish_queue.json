@@ -1,8 +1,8 @@
 {
   "generated_at": "2026-08-26T10:29:08.991987",
   "total": 331,
-  "published": 29,
-  "remaining": 302,
+  "published": 30,
+  "remaining": 301,
   "videos": [
     {
       "path": "/Users/hyx/ssd/codespace/personal/images/20260825/minimax/video_5.mp4",
@@ -1141,7 +1141,32 @@
       "hashtags": [
         "#night"
       ],
-      "published": {}
+      "published": {
+        "xhs": {
+          "ts": 1787727032.17984,
+          "method": "cdp",
+          "status": "ok",
+          "error": ""
+        },
+        "douyin": {
+          "ts": 1787727013.106334,
+          "method": "cdp",
+          "status": "ok",
+          "error": ""
+        },
+        "kuaishou": {
+          "ts": 1787727013.106345,
+          "method": "cdp",
+          "status": "ok",
+          "error": ""
+        },
+        "weixin": {
+          "ts": 1787727013.106347,
+          "method": "cdp",
+          "status": "ok",
+          "error": ""
+        }
+      }
     },
     {
       "path": "/Users/hyx/ssd/codespace/personal/images/20260819/minimax/video_5.mp4",
