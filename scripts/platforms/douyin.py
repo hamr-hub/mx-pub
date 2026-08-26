@@ -79,9 +79,10 @@ def publish_via_browser(*, title, description, video, topics=None, location=None
             time.sleep(5)
         time.sleep(2)
 
-        # Upload video
+        # Upload video (page has 2 file inputs: image for cover + video for content.
+        # Must use the VIDEO one by accept attribute to avoid uploading video to image input.)
         try:
-            inp = page.locator("input[type=file]").first
+            inp = page.locator("input[type=file][accept*='video']").first
             inp.set_input_files(video, timeout=20000)
         except Exception as e:
             return PublishResult("douyin", "fail", method="cdp", error=f"upload: {e}")
