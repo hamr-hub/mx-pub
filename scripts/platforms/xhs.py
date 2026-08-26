@@ -83,9 +83,10 @@ def publish_via_browser(*, title, description, video, topics=None, location=None
         page.set_viewport_size({"width": 1280, "height": 800})
         time.sleep(1)
 
-        # Upload video (file input is hidden; just attach)
+        # Upload video
         try:
-            page.locator("input[type=file]").first.set_input_files(video, timeout=15000)
+            inp = page.locator("input[type=file][accept*='video']").first
+            inp.set_input_files(video, timeout=15000)
         except Exception as e:
             return PublishResult("xhs", "fail", method="cdp", error=f"upload_failed: {e}")
 

@@ -67,10 +67,10 @@ def publish_via_browser(*, title, description, video, topics=None, location=None
         time.sleep(5)
         time.sleep(2)
 
-        # Upload (file input is hidden; just attach directly)
+        # Upload (page has 2 file inputs: video + image. Use video one explicitly)
         try:
             time.sleep(2)
-            inp = page.locator("input[type=file]").first
+            inp = page.locator("input[type=file][accept*='video']").first
             inp.set_input_files(video, timeout=60000)
         except Exception as e:
             return PublishResult("kuaishou", "fail", method="cdp", error=f"upload: {e}")
