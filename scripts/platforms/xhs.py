@@ -68,14 +68,26 @@ def publish_via_browser(*, title, description, video, topics=None, location=None
     with sync_playwright() as p:
         browser = p.chromium.connect_over_cdp(cdp_url, timeout=15000)
         ctx = browser.contexts[0]
-        page = next((pg for pg in ctx.pages if "xiaohongshu.com" in pg.url and "publish" in pg.url), None)
+        # Find page that already has the file input (the real editor tab)
+        page = None
+        for pg in ctx.pages:
+            if "xiaohongshu.com" in pg.url and "publish" in pg.url:
+                if pg.locator("input[type=file]").count() > 0:
+                    page = pg
+                    break
 
         if page is None:
             page = ctx.new_page()
             page.goto(EDITOR_URL, wait_until="domcontentloaded", timeout=30000)
-            time.sleep(3)
-            # Find the editor tab (xhs opens the actual editor in a new tab)
-            page = next((pg for pg in ctx.pages if "xiaohongshu.com" in pg.url and "publish" in pg.url), None)
+            # xhs opens the editor in a NEW tab via JS. Wait for it.
+            for _ in range(15):
+                time.sleep(1)
+                for pg in ctx.pages:
+                    if "xiaohongshu.com" in pg.url and "publish" in pg.url and pg.locator("input[type=file]").count() > 0:
+                        page = pg
+                        break
+                if page:
+                    break
             if page is None:
                 return PublishResult("xhs", "fail", method="cdp", error="no_editor_after_navigate")
 
@@ -83,9 +95,14 @@ def publish_via_browser(*, title, description, video, topics=None, location=None
         page.set_viewport_size({"width": 1280, "height": 800})
         time.sleep(1)
 
-        # Upload video (xhs accept attribute lists extensions like .mp4,.mov, not 'video' word)
+        # Upload video (xhs only has 1 file input)
+        # Wait for input to exist (page may take time after navigation)
+        for _ in range(15):
+            if page.locator("input[type=file]").count() > 0:
+                break
+            time.sleep(1)
         try:
-            inp = page.locator("input[type=file][accept*='.mp4']").first
+            inp = page.locator("input[type=file]").first
             inp.set_input_files(video, timeout=15000, no_wait_after=True)
         except Exception as e:
             return PublishResult("xhs", "fail", method="cdp", error=f"upload_failed: {e}")
