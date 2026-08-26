@@ -38,7 +38,8 @@
     "publish_url": "https://creator.xiaohongshu.com/new/home?source=official",
     "login_url": "https://creator.xiaohongshu.com/login",
     "analytics": {
-      "url": "https://creator.xiaohongshu.com/data-board",
+      "url": "https://creator.xiaohongshu.com/statistics/account/v2",
+      "entry_clicks": ["数据看板", "账号概览"],
       "fields": [
         {"key": "published_count", "match": "笔记数"},
         {"key": "total_views",     "match": "曝光数"},
@@ -46,7 +47,8 @@
         {"key": "total_comments",  "match": "评论数"},
         {"key": "total_favorites", "match": "收藏数"},
         {"key": "fans_count",      "match": "粉丝数"}
-      ]
+      ],
+      "_note": "Account requires 数据权限 grant (申请权限 button on the page). Blocked at account level."
     }
   },
   "weixin_channels": {
