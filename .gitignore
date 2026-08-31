@@ -7,6 +7,11 @@ _benchmark/stats/*_dryrun.png
 _benchmark/stats/*.json
 _benchmark/stats/REPORT_*.md
 
+# Local runtime data (per-machine paths, publish history)
+publish_queue.json
+publish_state.json
+*.backup
+
 # Logs
 logs/
 *.log

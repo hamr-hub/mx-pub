@@ -12,6 +12,7 @@ This replaces the per-platform Playwright sessions which caused
 "Timeout 15000ms" errors when 4+ sessions were created in rapid succession.
 """
 import json
+import os
 import sys
 import time
 from pathlib import Path
@@ -32,6 +33,12 @@ except Exception:
 
 QUEUE_FILE = HERE / "publish_queue.json"
 PLATFORMS = ["xhs", "douyin", "kuaishou", "weixin"]
+# Allow env var to filter out platforms (comma-separated, e.g. SKIP_PLATFORMS=xhs)
+_skip = os.environ.get("SKIP_PLATFORMS", "")
+if _skip:
+    skip_set = {p.strip() for p in _skip.split(",") if p.strip()}
+    PLATFORMS = [p for p in PLATFORMS if p not in skip_set]
+    print(f"[loop] SKIP_PLATFORMS={_skip} → active platforms: {PLATFORMS}")
 
 
 def load_queue():
@@ -133,7 +140,9 @@ def main():
 
     # Parallel publish — each platform in its own Playwright session.
     # fast_mode skips confirmation waits (target: <30s total wall time).
-    results = publish_parallel(targets, video, cdp_url=cdp_url, fast_mode=True)
+    # MX_PUB_NORMAL_MODE=1 disables fast_mode for proper verification (slower but accurate).
+    use_fast_mode = not os.environ.get("MX_PUB_NORMAL_MODE")
+    results = publish_parallel(targets, video, cdp_url=cdp_url, fast_mode=use_fast_mode)
 
     # Update per-platform status
     for platform in targets:
