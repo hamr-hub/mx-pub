@@ -31,10 +31,13 @@ for i in {1..30}; do
     sleep 1
 done
 
-# Run the loop (continuous)
-echo "[entrypoint] starting publish loop..."
+# Run the stable batch driver (concurrent across platforms, exits when the
+# queue drains; rerun periodically to pick up newly queued videos).
+echo "[entrypoint] starting publish batch..."
 while true; do
-    python3 loop_publish_v2.py 2>&1
-    echo "[entrypoint] wave done, sleeping 10min..."
+    # || true: fail rows stay pending in publish_queue.json and are retried;
+    # a nonzero exit must not kill the container under `set -e`.
+    python3 batch_publish.py 2>&1 || true
+    echo "[entrypoint] batch done, sleeping 10min..."
     sleep 600
 done

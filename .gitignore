@@ -10,7 +10,12 @@ _benchmark/stats/REPORT_*.md
 # Local runtime data (per-machine paths, publish history)
 publish_queue.json
 publish_state.json
+collections_state.json
 *.backup
+
+# Archived local runtime data (scripts stay tracked, data does not)
+archive/**/*.json
+archive/**/*.bak*
 
 # Logs
 logs/

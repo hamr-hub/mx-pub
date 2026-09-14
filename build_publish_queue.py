@@ -9,9 +9,10 @@ import re
 from pathlib import Path
 from datetime import datetime
 
+HERE = Path(__file__).resolve().parent
 IMAGES_DIR = Path("/Users/hyx/ssd/codespace/personal/images")
-QUEUE_FILE = Path("/Users/hyx/workspace/mx-pub/publish_queue.json")
-STATE_FILE = Path("/Users/hyx/workspace/mx-pub/publish_state.json")
+QUEUE_FILE = HERE / "publish_queue.json"
+STATE_FILE = HERE / "publish_state.json"
 
 
 def extract_title_from_prompt(prompt_text: str) -> str:
