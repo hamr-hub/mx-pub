@@ -23,6 +23,14 @@ FATAL_CONNECTION_MARKERS = (
     "Connection closed",
     "Playwright connection closed",
     "Target closed",
+    # A crashed renderer is a dead target too. Raised as an exception out of
+    # page.* calls, so without this the driver treated a crashed tab as a
+    # normal per-video failure and retried against it.
+    "Target crashed",
+    "Target has crashed",
+    "Page crashed",
+    "page has crashed",
+    "Renderer crashed",
     "Target page, context or browser has been closed",
     "Target page has been closed",
     "Browser has been closed",

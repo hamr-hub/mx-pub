@@ -35,7 +35,7 @@ def _make_queue(n=N):
 
 def _run_loop(monkeypatch, *, safety_env=None, save_queue=None,
               queue=None, stub_media=True, result_fn=None,
-              max_recovery="0"):
+              max_recovery="0", raise_fn=None):
     """Run the real run_platform loop; return (attempted titles, summary)."""
     attempted: list[str] = []
 
@@ -44,6 +44,8 @@ def _run_loop(monkeypatch, *, safety_env=None, save_queue=None,
         def publish_on_page(page, title, description, video, topics,
                             location, collection):
             attempted.append(title)
+            if raise_fn is not None:
+                return raise_fn("douyin", title)
             if result_fn is not None:
                 return result_fn("douyin", title)
             return PublishResult("douyin", "ok", method="fake")
@@ -245,3 +247,45 @@ def test_stale_browser_fs_view_restarts_the_session_once(monkeypatch, tmp_path):
         {**videos[0], "published": {"douyin": {"status": "fail",
                                                "error": enoent}}},
         "douyin") is True
+
+
+def test_crashed_renderer_recovers_and_keeps_publishing(monkeypatch, tmp_path):
+    """A crashed tab must cost one rebuild, not the rest of the queue.
+
+    Regression: `Page.bring_to_front: Target crashed` scored unknown/retry, so
+    a real run died after 15 consecutive crash rows. The classifier now reads
+    it as a dead target, which routes into session recovery — and if Chrome is
+    genuinely gone, _recover_session relaunches it before resuming.
+    """
+    videos = []
+    for i in range(3):
+        f = tmp_path / f"v{i}.mp4"
+        f.write_bytes(b"x" * 32)
+        videos.append({"name": f"v{i}.mp4", "title": f"clip-{i}",
+                       "path": str(f), "description": "d",
+                       "hashtags": ["t"], "published": {}})
+    queue = {"total": 3, "videos": videos}
+
+    calls: list[str] = []
+
+    def raise_fn(platform, title):
+        calls.append(title)
+        if len(calls) == 1:
+            raise RuntimeError("Page.bring_to_front: Target crashed")
+        return PublishResult(platform, "ok", method="fake")
+
+    # Chrome is gone, so _recover_session must relaunch it.
+    monkeypatch.setattr("core.environment.cdp_alive", lambda url: False,
+                        raising=False)
+    relaunched: list[str] = []
+    monkeypatch.setattr("batch_publish.ensure_chrome",
+                        lambda url, headless=False: relaunched.append(url),
+                        raising=False)
+
+    attempted, summary = _run_loop(monkeypatch, queue=queue, stub_media=False,
+                                   raise_fn=raise_fn, max_recovery="2")
+
+    assert relaunched, "a dead Chrome must be relaunched before resuming"
+    assert attempted == ["clip-0", "clip-1", "clip-2"]
+    assert summary["ok"] == 2
+    assert summary["fail"] == 1

@@ -179,8 +179,16 @@ TRANSIENT_PATTERNS = (
     ("cdn_throttle", ("429", "too many requests from", "throttled")),
     ("publish_in_progress", ("上次发布未完成", "publish in progress",
                                 "operation in progress")),
+    # "Target crashed" is the renderer dying, which is just as terminal as a
+    # closed target: there is no retry point on a dead page. It was missing
+    # here while the legacy list in publisher.py had "page crashed", so a
+    # crashed Chrome scored unknown/retry and the run ground through every
+    # remaining row on a page that could never work again.
     ("fatal_connection", ("connection closed", "target closed",
-                            "session closed", "browser closed",
+                            "target crashed", "target has crashed",
+                            "page crashed", "page has crashed",
+                            "renderer crashed", "session closed",
+                            "browser closed",
                             "browser has been closed",
                             "target page, context or browser has been closed",
                             "target page has been closed",
