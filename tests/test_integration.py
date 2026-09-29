@@ -174,3 +174,95 @@ if __name__ == "__main__":
         import traceback
         traceback.print_exc()
         sys.exit(1)
+
+
+# ---------------------------------------------------------------------------
+# The self-learning loop must actually close
+# ---------------------------------------------------------------------------
+
+def _seed(platform: str, *, n_ok: int, gap: float, duration: float,
+          status: str = "ok", store=None):
+    """Write n events spaced `gap` seconds apart, starting an hour ago."""
+    import time as _t
+    from self_learn.stats import Event
+    base = _t.time() - 7200
+    for i in range(n_ok):
+        store.record(Event(ts=base + i * gap, platform=platform,
+                           video_id=f"v{i}", status=status, method="cdp",
+                           duration_s=duration))
+    return store
+
+
+def test_learned_interval_ignores_publish_duration():
+    from core.pacing import PacingController  # noqa: F401
+    from self_learn.stats import StatsStore
+    """A slow platform must not also be given a huge extra wait.
+
+    Regression: the interval was avg_dur * 1.5, which read douyin's 451s
+    average publish as "wait 677s more between videos" — ~27h of pure waiting
+    on a 96-video queue. The publish duration already paces the loop; the
+    pacer should only add bounded breathing room.
+    """
+    from self_learn.optimizer import (MAX_LEARNED_INTERVAL_S,
+                                      StrategyOptimizer, clamp_pacing)
+    with _Tmp() as tmp:
+        store = StatsStore(tmp / "events.jsonl")
+        # Ten successful publishes, 450s apart, each taking 450s.
+        _seed("slowplat", n_ok=10, gap=450.0, duration=450.0, store=store)
+        rec = StrategyOptimizer(store).recommend("slowplat")
+        params = clamp_pacing(rec.pacing)
+        assert params["min_interval_s"] <= MAX_LEARNED_INTERVAL_S * 1.5, rec
+
+        # A fast platform that has been publishing back-to-back without
+        # trouble is not slowed down to the historical median either.
+        _seed("fastplat", n_ok=10, gap=5.0, duration=5.0, store=store)
+        fast = clamp_pacing(
+            StrategyOptimizer(store).recommend("fastplat").pacing)
+        assert fast["min_interval_s"] < params["min_interval_s"]
+
+
+def test_pacing_clamps_bound_learned_values():
+    from self_learn.optimizer import PACING_BOUNDS, clamp_pacing
+    # Assert concrete numbers, not PACING_BOUNDS itself: a test that reads the
+    # bound it is meant to enforce cannot fail when the bound is widened.
+    assert PACING_BOUNDS["min_interval_s"] == (30.0, 600.0)
+    assert PACING_BOUNDS["burst_rest_s"] == (60.0, 1800.0)
+    assert PACING_BOUNDS["fail_rate_backoff"] == (0.10, 0.95)
+
+    assert clamp_pacing({"min_interval_s": 10 ** 9})["min_interval_s"] == 600.0
+    assert clamp_pacing({"min_interval_s": -5})["min_interval_s"] == 30.0
+    assert clamp_pacing({"fail_rate_backoff": 0.0})["fail_rate_backoff"] == 0.10
+    assert clamp_pacing({"fail_rate_backoff": 1.0})["fail_rate_backoff"] == 0.95
+    # Unparseable and unknown keys are dropped, never crash the batch.
+    assert "min_interval_s" not in clamp_pacing({"min_interval_s": "soon"})
+    assert clamp_pacing({"nonsense": 5}) == {}
+
+
+def test_apply_learned_pacing_pushes_params_into_the_controller():
+    from core.pacing import PacingController
+    from self_learn.optimizer import Recommendation, apply_pacing
+    p = PacingController(["douyin"])
+    before = p.get("douyin").min_interval_s
+    rec = Recommendation(platform="douyin",
+                         pacing={"min_interval_s": 9999.0,
+                                 "burst_rest_s": 120.0})
+    applied = apply_pacing(rec, p)
+    # Clamped to the documented ceiling, and actually written to the pacer.
+    assert applied["min_interval_s"] == 600.0
+    assert p.get("douyin").min_interval_s == 600.0
+    assert p.get("douyin").burst_rest_s == 120.0
+    assert p.get("douyin").min_interval_s != before
+    # An empty recommendation changes nothing and does not raise.
+    assert apply_pacing(Recommendation(platform="douyin"), p) == {}
+
+
+def test_apply_learned_pacing_swallows_failures():
+    from self_learn.optimizer import Recommendation, apply_pacing
+
+    class Exploding:
+        def update_params(self, *a, **k):
+            raise RuntimeError("pacer is on fire")
+
+    assert apply_pacing(Recommendation(platform="douyin",
+                                       pacing={"min_interval_s": 200.0}),
+                        Exploding()) == {}

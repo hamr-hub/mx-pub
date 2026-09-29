@@ -691,6 +691,7 @@ def main(platforms: list | None = None, *, retry_failed: bool = False,
     # Self-learning + adaptive pacing
     _stats = StatsStore() if _HAS_NEXT_GEN else None
     _pacing = (PacingController.load() if _HAS_NEXT_GEN else None)
+    _apply_learned_pacing(_stats, _pacing, platforms)
     Hooks.emit("batch:before", queue=queue, platforms=platforms)
 
     results = {}
@@ -776,6 +777,36 @@ def _record_event(stats: "StatsStore", video: dict, result: PublishResult,
         pass
 
 
+def _apply_learned_pacing(stats, pacing, platforms) -> dict:
+    """Close the self-learning loop: act on what the optimizer recommends.
+
+    The optimizer already produced a `pacing` dict in exactly the shape
+    PacingController.update_params() takes, but nothing ever applied it — the
+    system measured its own history and then ignored it. Applied at startup
+    for every platform, whether or not MX_PACING is on, because the pacer
+    records results regardless; that way the state is already tuned the moment
+    the gate is switched on. Values are clamped (see optimizer.PACING_BOUNDS)
+    and anything that goes wrong here is swallowed — advice must never be able
+    to stop a publish.
+    """
+    if stats is None or pacing is None:
+        return {}
+    applied: dict = {}
+    try:
+        from self_learn.optimizer import StrategyOptimizer, apply_pacing
+        opt = StrategyOptimizer(stats)
+        for plat in platforms:
+            rec = opt.recommend(plat)
+            params = apply_pacing(rec, pacing)
+            if params:
+                applied[plat] = params
+                pretty = ", ".join(f"{k}={v:g}" for k, v in params.items())
+                print(f"🧠 {plat} 采纳历史学习参数: {pretty}", flush=True)
+    except Exception:
+        return applied
+    return applied
+
+
 def _abort_batch_on_safety() -> bool:
     """Whether a safety-gate veto should halt the whole platform batch.
 
@@ -835,4 +866,7 @@ def _maybe_risk_block(platform: str, stats, *,
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    # RISK_FORCE=1 overrides the self-learning risk gate. Use only after a
+    # critical signal traced to infrastructure (e.g. the SMB mount dropping),
+    # never to push through content/account rejections.
+    sys.exit(main(force=os.environ.get("RISK_FORCE") == "1"))
