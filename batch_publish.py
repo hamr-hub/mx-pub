@@ -477,6 +477,23 @@ def run_platform(platform: str, queue: dict, cdp_url: str,
                         if cls.is_fatal_connection:
                             connection_dead = True
                             break
+                        # The Playwright driver is a long-lived Node process.
+                        # When it holds a stale view of the filesystem — an
+                        # external volume remounted underneath it — every
+                        # set_input_files comes back ENOENT for a file the
+                        # driver process itself can open. No page-level
+                        # recovery touches that, so a refresh/re-login loop
+                        # just burns two round-trips per remaining row. Route
+                        # it into the existing session-recovery path: a fresh
+                        # driver process re-reads the mount table and the rest
+                        # of the queue publishes normally.
+                        if (cls.label == "media_unreadable"
+                                and not missing_media_reason(video_path)):
+                            print(f"[{platform}] {idx}/{len(videos)} "
+                                  "🔁 浏览器读不到本地文件（驱动进程的文件系统视图已过期）；"
+                                  "重启 Playwright 会话", flush=True)
+                            connection_dead = True
+                            break
                         # Run the recovery engine BEFORE deciding to retry.
                         rec = perform_recovery(cls.action, page=page,
                                                 platform=platform,

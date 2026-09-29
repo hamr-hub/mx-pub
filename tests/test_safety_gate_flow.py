@@ -34,7 +34,8 @@ def _make_queue(n=N):
 
 
 def _run_loop(monkeypatch, *, safety_env=None, save_queue=None,
-              queue=None, stub_media=True):
+              queue=None, stub_media=True, result_fn=None,
+              max_recovery="0"):
     """Run the real run_platform loop; return (attempted titles, summary)."""
     attempted: list[str] = []
 
@@ -43,6 +44,8 @@ def _run_loop(monkeypatch, *, safety_env=None, save_queue=None,
         def publish_on_page(page, title, description, video, topics,
                             location, collection):
             attempted.append(title)
+            if result_fn is not None:
+                return result_fn("douyin", title)
             return PublishResult("douyin", "ok", method="fake")
 
         @staticmethod
@@ -82,7 +85,7 @@ def _run_loop(monkeypatch, *, safety_env=None, save_queue=None,
                         lambda *a, **k: None)
     monkeypatch.setattr(batch_publish, "attach_kuaishou_collections",
                         lambda *a, **k: None)
-    monkeypatch.setenv("MX_MAX_RECOVERY", "0")
+    monkeypatch.setenv("MX_MAX_RECOVERY", str(max_recovery))
     monkeypatch.setattr(
         "playwright.sync_api.sync_playwright", lambda: fake_pw, raising=False)
     # raw_cdp.tab probe: pretend a tab already exists
@@ -194,3 +197,51 @@ def test_missing_media_never_reaches_the_browser(monkeypatch, tmp_path):
 
     # Retry-later, not terminal: an unmounted volume comes back.
     assert batch_publish.needs_publish(row, "douyin") is True
+
+
+def test_stale_browser_fs_view_restarts_the_session_once(monkeypatch, tmp_path):
+    """A driver that cannot see a file the driver *can* see needs a new driver.
+
+    The Playwright driver is a long-lived Node process; when an external volume
+    is remounted underneath it, every set_input_files returns ENOENT forever.
+    Page-level recovery cannot help, so this must route into the existing
+    session-recovery path instead of retrying each remaining row twice.
+    """
+    videos = []
+    for i in range(3):
+        f = tmp_path / f"v{i}.mp4"
+        f.write_bytes(b"x" * 32)
+        # "clip-N", not "video-N": _run_loop's safety veto targets video-1,
+        # and this test is about session recovery, not the safety gate.
+        videos.append({"name": f"v{i}.mp4", "title": f"clip-{i}",
+                       "path": str(f), "description": "d",
+                       "hashtags": ["t"], "published": {}})
+    queue = {"total": 3, "videos": videos}
+
+    enoent = ("upload: [Errno 2] No such file or directory: "
+              f"'{videos[0]['path']}'")
+    seen: list[str] = []
+
+    def result_fn(platform, title):
+        seen.append(title)
+        if len(seen) == 1:                    # only the first attempt fails
+            return PublishResult(platform, "fail", method="cdp", error=enoent)
+        return PublishResult(platform, "ok", method="fake")
+
+    # Chrome is alive; the session just needs rebuilding.
+    monkeypatch.setattr("core.environment.cdp_alive", lambda url: True,
+                        raising=False)
+
+    attempted, summary = _run_loop(monkeypatch, queue=queue, stub_media=False,
+                                   result_fn=result_fn, max_recovery="2")
+
+    # video-0 fails once, the session is rebuilt, and the remaining videos
+    # publish instead of each burning two more doomed round-trips.
+    assert attempted == ["clip-0", "clip-1", "clip-2"]
+    assert summary["ok"] == 2
+    assert summary["fail"] == 1
+    # The failed row is transient, so a later run still picks it up.
+    assert batch_publish.needs_publish(
+        {**videos[0], "published": {"douyin": {"status": "fail",
+                                               "error": enoent}}},
+        "douyin") is True
