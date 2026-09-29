@@ -159,6 +159,19 @@ RECOVERABLE_PATTERNS = (
 
 #: Transient infra — retry soon with same code.
 TRANSIENT_PATTERNS = (
+    # A media path the *browser* cannot open is not a verdict on the video.
+    # It is listed first so this specific diagnosis beats the generic
+    # "timeout" substring. In production this was the single largest error
+    # class: a long-lived browser kept a stale view of an external volume,
+    # returned ENOENT for files the shell could open, and every row was
+    # scored unknown/retry — a 5s retry loop that burned browser round-trips
+    # and pushed the platform toward a risk-monitor abort. Retrying after a
+    # fresh browser session is exactly the right remedy, so it is transient,
+    # with a cooldown long enough not to spin.
+    ("media_unreadable", ("file_missing", "no such file or directory",
+                          "filenotfounderror", "errno 2",
+                          "文件不存在", "视频文件不存在", "找不到文件",
+                          "cannot find the file", "is not a file")),
     ("timeout", ("timeout", "超时", "timed out")),
     ("connection_reset", ("connection reset", "connection refused",
                            "econnreset", "connection aborted")),
@@ -340,6 +353,7 @@ def classify(error: Optional[str], *,
     if m := _match_table(text, TRANSIENT_PATTERNS):
         cd_map = {
             "fatal_connection": 0.0,
+            "media_unreadable": 60.0,
             "timeout": 5.0,
             "connection_reset": 3.0,
             "network_blip": 10.0,

@@ -209,6 +209,42 @@ def test_hooks_failure_isolation():
 # pacing.py
 # ---------------------------------------------------------------------------
 
+@t("media: missing_media_reason detects unusable sources")
+def test_missing_media_reason():
+    from core.media import missing_media_reason
+    with _Tmp() as tmp:
+        good = tmp / "v.mp4"
+        good.write_bytes(b"x" * 16)
+        assert missing_media_reason(str(good)) == ""
+        assert missing_media_reason("") == "empty_path"
+        assert missing_media_reason(str(tmp / "nope.mp4")) == "not_a_file"
+        assert missing_media_reason(str(tmp)) == "not_a_file"
+        empty = tmp / "empty.mp4"
+        empty.write_bytes(b"")
+        assert missing_media_reason(str(empty)) == "zero_bytes"
+
+@t("errors: unreadable media is transient, not terminal")
+def test_media_unreadable_is_transient():
+    """A path the browser cannot open says nothing about the video.
+
+    A long-lived browser with a stale view of an external volume produced
+    ENOENT for files the shell could open. Scoring that unknown/retry caused a
+    5s retry loop; scoring it terminal would permanently skip 25 good videos.
+    """
+    from core.errors import ErrorClass, classify
+    for text in ("upload: [Errno 2] No such file or directory: '/v/a.mp4'",
+                 "file_missing:not_a_file",
+                 "FileNotFoundError",
+                 "视频文件不存在"):
+        c = classify(text, status="fail")
+        assert c.cls is ErrorClass.TRANSIENT, text
+        assert c.label == "media_unreadable", text
+        assert c.cooldown_s >= 30, text
+
+    # It must not swallow the neighbouring diagnoses.
+    assert classify("upload: Locator.set_input_files: Timeout 30000ms exceeded",
+                    status="fail").label == "timeout"
+
 @t("pacing: allow on fresh state")
 def test_pacing_fresh():
     from core.pacing import PacingController

@@ -66,7 +66,7 @@ docker-compose up
 | `MX_SAFETY=1` | Enable the content safety gate | off |
 | `MX_INSIGHTS_MD` | Insights markdown output path | `insights_report.md` |
 | `MX_INSIGHTS_MODEL` | LLM used for the insights narrative | none (heuristic) |
-| `MX_MIN_INTERVAL_S` / `MX_BURST_LIMIT` / `MX_BURST_REST_S` / `MX_FAIL_BACKOFF` | Learned pacing parameters | `120` / `5` / `300` / `0.6` |
+| `MX_MIN_INTERVAL_S` / `MX_BURST_LIMIT` / `MX_BURST_REST_S` / `MX_FAIL_BACKOFF` / `MX_LOW_RATE_REST_S` | Learned pacing parameters | `120` / `5` / `300` / `0.6` / `1800` |
 
 ## Retry semantics
 

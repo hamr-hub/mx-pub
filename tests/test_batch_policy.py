@@ -74,6 +74,18 @@ def test_permanent_failures_stay_terminal_until_forced():
             row, "douyin", retry_failed=True) is True, error
 
 
+def test_unreadable_media_is_retried_on_a_later_run():
+    """A missing file is usually an unmounted volume, not a dead video.
+
+    `blocked` is terminal forever, so a pre-flight media check that reported
+    `blocked` would permanently skip every row queued on that volume.
+    """
+    for error in ("upload: [Errno 2] No such file or directory: "
+                  "'/Volumes/ssd/codespace/personal/images/a/v1.mp4'",
+                  "file_missing:not_a_file"):
+        assert batch_publish.needs_publish(_row("fail", error),
+                                           "douyin") is True, error
+
 def test_failure_with_no_recorded_error_gets_one_more_chance():
     assert batch_publish.needs_publish(_row("fail", ""), "douyin") is True
 

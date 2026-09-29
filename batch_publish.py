@@ -36,7 +36,7 @@ from publisher import (
 )
 from core.environment import ensure_chrome, get_env_summary
 from core.watch import is_fatal_connection_error
-from core.media import is_publishable_duration
+from core.media import is_publishable_duration, missing_media_reason
 from core.jsonio import atomic_write_json, read_json_safe
 
 QUEUE_FILE = Path(os.environ.get("MX_QUEUE_FILE", HERE / "publish_queue.json"))
@@ -369,8 +369,25 @@ def run_platform(platform: str, queue: dict, cdp_url: str,
                 collection = today_coll
             video_path = (video.get("platform_paths") or {}).get(platform) \
                 or video["path"]
-            allowed, dur = is_publishable_duration(video_path)
-            if not allowed:
+            # Fail fast when the source media is gone (unmounted volume,
+            # moved file, truncated copy). is_publishable_duration() fails
+            # open on unreadable media, so without this the row reached
+            # Playwright and came back as `upload: [Errno 2] ...`, which the
+            # classifier scored unknown/retry — burning a browser round-trip
+            # per row, every run, until the risk monitor aborted the platform.
+            media_problem = missing_media_reason(video_path)
+            allowed, dur = (False, 0.0) if media_problem else \
+                is_publishable_duration(video_path)
+            if media_problem:
+                # "fail", not "blocked": a missing file is very often a
+                # temporarily-unmounted volume, and a blocked row is terminal
+                # forever. The classifier reads file_missing as transient, so
+                # the row is retried on a later run without spinning here.
+                result = PublishResult(platform, "fail", method="preflight",
+                                       error=f"file_missing:{media_problem}")
+                print(f"[{platform}] {idx}/{len(videos)} 🚫 skipped {short} "
+                      f"({media_problem}: {video_path})", flush=True)
+            elif not allowed:
                 # Account rule: never post <5s clips. Block before any upload
                 # (WX silently rejects <3s; old runs burned 2x420s here).
                 result = PublishResult(platform, "blocked", method="preflight",

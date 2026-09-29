@@ -187,6 +187,7 @@ python3 mxpub.py extensions
 | `MX_BURST_LIMIT=5` | 连续发布上限 |
 | `MX_BURST_REST_S=300` | 爆发后强制休息秒数 |
 | `MX_FAIL_BACKOFF=0.6` | 触发退避的成功率阈值 |
+| `MX_LOW_RATE_REST_S=1800` | 成功率过低后的冷却秒数，冷却结束放一次试探 |
 | `MX_INSIGHTS_MODEL=...` | 洞察报告用的 LLM 模型 |
 | `MX_PLUGINS_DIR=...` | 自定义插件目录 |
 

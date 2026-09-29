@@ -33,7 +33,8 @@ def _make_queue(n=N):
     }
 
 
-def _run_loop(monkeypatch, *, safety_env=None, save_queue=None):
+def _run_loop(monkeypatch, *, safety_env=None, save_queue=None,
+              queue=None, stub_media=True):
     """Run the real run_platform loop; return (attempted titles, summary)."""
     attempted: list[str] = []
 
@@ -68,6 +69,13 @@ def _run_loop(monkeypatch, *, safety_env=None, save_queue=None):
     monkeypatch.setattr(batch_publish, "_get_module", lambda p: FakeMod)
     monkeypatch.setattr(batch_publish, "is_publishable_duration",
                         lambda p: (True, 10.0))
+    # This suite is about the safety gate, not media availability: the queue
+    # uses synthetic /tmp paths, so let the pre-flight media check pass and
+    # keep the real duration stub above as the single media gate here.
+    # stub_media=False exercises the real check.
+    if stub_media:
+        monkeypatch.setattr(batch_publish, "missing_media_reason",
+                            lambda p: "")
     monkeypatch.setattr(batch_publish, "save_queue",
                         save_queue or (lambda q: None))
     monkeypatch.setattr(batch_publish, "reconcile_douyin_collections",
@@ -95,8 +103,9 @@ def _run_loop(monkeypatch, *, safety_env=None, save_queue=None):
     Hooks.register("video:before_publish", _veto)
     monkeypatch.setattr(batch_publish, "_HAS_NEXT_GEN", True)
     try:
-        summary = batch_publish.run_platform("douyin", _make_queue(),
-                                             "http://127.0.0.1:9222")
+        summary = batch_publish.run_platform(
+            "douyin", queue if queue is not None else _make_queue(),
+            "http://127.0.0.1:9222")
     finally:
         Hooks._hooks.pop("video:before_publish", None)
     return attempted, summary
@@ -144,3 +153,44 @@ def test_abort_batch_env_is_off_by_default(monkeypatch):
     assert batch_publish._abort_batch_on_safety() is True
     monkeypatch.setenv("MX_SAFETY_ABORT_BATCH", "off")
     assert batch_publish._abort_batch_on_safety() is False
+
+
+# ---------------------------------------------------------------------------
+# Media pre-flight (the real check, not stubbed)
+# ---------------------------------------------------------------------------
+
+def test_missing_media_never_reaches_the_browser(monkeypatch, tmp_path):
+    """A row whose file is gone must not cost a Playwright round-trip.
+
+    Regression: is_publishable_duration() fails *open* on unreadable media, so
+    every such row was handed to the platform module and came back as
+    `upload: [Errno 2] No such file or directory`.
+    """
+    real = tmp_path / "v0.mp4"
+    real.write_bytes(b"x" * 32)
+    gone = tmp_path / "v1.mp4"          # deliberately never created
+
+    queue = {
+        "total": 2,
+        "videos": [
+            {"name": "v0.mp4", "title": "video-0", "path": str(real),
+             "description": "d", "hashtags": ["t"], "published": {}},
+            {"name": "v1.mp4", "title": "video-1", "path": str(gone),
+             "description": "d", "hashtags": ["t"], "published": {}},
+        ],
+    }
+    saved: list[dict] = []
+    attempted, summary = _run_loop(monkeypatch, queue=queue, stub_media=False,
+                                   save_queue=lambda q: saved.append(json_copy(q)))
+
+    assert attempted == ["video-0"], (
+        "the missing file must never be handed to the platform module")
+    assert summary["ok"] == 1
+
+    row = next(v for v in saved[-1]["videos"] if v["title"] == "video-1")
+    info = row["published"]["douyin"]
+    assert info["status"] == "fail"
+    assert info["error"].startswith("file_missing:")
+
+    # Retry-later, not terminal: an unmounted volume comes back.
+    assert batch_publish.needs_publish(row, "douyin") is True
