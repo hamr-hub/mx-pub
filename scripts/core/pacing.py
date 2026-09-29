@@ -40,6 +40,7 @@ DEFAULT_MIN_INTERVAL_S = float(os.environ.get("MX_MIN_INTERVAL_S", "120"))     #
 DEFAULT_BURST_LIMIT = int(os.environ.get("MX_BURST_LIMIT", "5"))                # 5 in a row
 DEFAULT_BURST_REST_S = float(os.environ.get("MX_BURST_REST_S", "300"))          # 5 min rest
 DEFAULT_FAIL_RATE_BACKOFF = float(os.environ.get("MX_FAIL_BACKOFF", "0.6"))      # 60% success threshold
+DEFAULT_LOW_RATE_REST_S = float(os.environ.get("MX_LOW_RATE_REST_S", "1800"))  # 30 min before a low-success probe
 
 
 @dataclass
@@ -56,6 +57,14 @@ class PlatformPacing:
     burst_limit: int = DEFAULT_BURST_LIMIT
     burst_rest_s: float = DEFAULT_BURST_REST_S
     fail_rate_backoff: float = DEFAULT_FAIL_RATE_BACKOFF
+
+    # How long to sit out after the success rate trips, before the single
+    # probe attempt that decides whether the platform recovered.
+    low_rate_rest_s: float = DEFAULT_LOW_RATE_REST_S
+
+    # True once a low-success-rate cool-down has been armed and is counting
+    # down. The probe is granted when the window closes, not before.
+    _low_rate_armed: bool = False
 
     # Last computed recommendation (for telemetry / logs).
     last_reason: str = ""
@@ -97,6 +106,18 @@ class PlatformPacing:
             return False, self.last_reason
         rate = self.success_rate
         if len(self.recent_results) >= 5 and rate < self.fail_rate_backoff:
+            # Time-bounded, not terminal. The window that trips this rule only
+            # changes when a publish is recorded — which the rule itself
+            # prevents — so a plain veto here blocked the platform forever and
+            # the queue could never drain. Arm a cool-down instead, then grant
+            # exactly one probe when it expires: if the probe succeeds the
+            # rolling rate recovers, and if it fails the rule re-arms.
+            if self._low_rate_armed:
+                self._low_rate_armed = False
+                self.last_reason = f"low_rate_probe({rate:.2f})"
+                return True, self.last_reason
+            self._low_rate_armed = True
+            self.enter_cool_down(self.low_rate_rest_s)
             self.last_reason = f"success_rate_low({rate:.2f})"
             return False, self.last_reason
         self.last_reason = "ok"
@@ -124,17 +145,24 @@ class PlatformPacing:
             "burst_limit": self.burst_limit,
             "burst_rest_s": self.burst_rest_s,
             "fail_rate_backoff": self.fail_rate_backoff,
+            "low_rate_rest_s": self.low_rate_rest_s,
+            "_low_rate_armed": self._low_rate_armed,
             "last_reason": self.last_reason,
         }
 
     @classmethod
     def from_dict(cls, d: dict) -> "PlatformPacing":
         p = cls(platform=d["platform"])
+        # burst_limit was missing from this list, so a tuned limit (or one
+        # raised via update_params) silently reverted to the default on every
+        # restart even though to_dict persisted it.
         for k in ("last_publish_ts", "burst_window_start", "cool_down_until",
-                  "min_interval_s", "burst_rest_s", "fail_rate_backoff"):
+                  "min_interval_s", "burst_limit", "burst_rest_s",
+                  "fail_rate_backoff", "low_rate_rest_s"):
             if k in d:
                 setattr(p, k, d[k])
         p.burst_count = d.get("burst_count", 0)
+        p._low_rate_armed = bool(d.get("_low_rate_armed", False))
         p.last_reason = d.get("last_reason", "")
         rr = d.get("recent_results", [])
         p.recent_results = deque(rr, maxlen=20)
@@ -204,7 +232,8 @@ class PacingController:
                       min_interval_s: Optional[float] = None,
                       burst_limit: Optional[int] = None,
                       burst_rest_s: Optional[float] = None,
-                      fail_rate_backoff: Optional[float] = None) -> None:
+                      fail_rate_backoff: Optional[float] = None,
+                      low_rate_rest_s: Optional[float] = None) -> None:
         p = self.get(platform)
         if min_interval_s is not None:
             p.min_interval_s = float(min_interval_s)
@@ -214,6 +243,8 @@ class PacingController:
             p.burst_rest_s = float(burst_rest_s)
         if fail_rate_backoff is not None:
             p.fail_rate_backoff = float(fail_rate_backoff)
+        if low_rate_rest_s is not None:
+            p.low_rate_rest_s = float(low_rate_rest_s)
 
     def snapshot(self) -> dict:
         return {p: pp.to_dict() for p, pp in self._pacing.items()}

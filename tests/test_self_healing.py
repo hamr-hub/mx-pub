@@ -262,6 +262,90 @@ def test_pacing_burst_limit_resumes_after_rest():
     assert allow is True
     assert reason == "ok"
 
+@t("pacing: tuned parameters survive a save/load roundtrip")
+def test_pacing_tuned_params_persist():
+    """Regression: burst_limit was persisted but never restored on load."""
+    import tempfile as _tf
+    from core.pacing import PacingController
+    with _tf.TemporaryDirectory() as d:
+        f = Path(d) / "pacing.json"
+        p1 = PacingController(["douyin"])
+        p1.update_params("douyin", min_interval_s=42.0, burst_limit=17,
+                         burst_rest_s=99.0, fail_rate_backoff=0.25,
+                         low_rate_rest_s=123.0)
+        p1.save(f)
+
+        pp2 = PacingController.load(f, ["douyin"]).get("douyin")
+        assert pp2.min_interval_s == 42.0
+        assert pp2.burst_limit == 17
+        assert pp2.burst_rest_s == 99.0
+        assert pp2.fail_rate_backoff == 0.25
+        assert pp2.low_rate_rest_s == 123.0
+
+@t("pacing: low success rate rests then probes instead of locking out")
+def test_pacing_low_success_rate_probes_after_rest():
+    """Regression: a tripped success rate used to veto the platform forever.
+
+    The rolling window only changes when a publish is recorded, and the rule
+    prevented any publish from being recorded, so the queue could never drain.
+    """
+    from core.pacing import PacingController
+    p = PacingController(["douyin"])
+    pp = p.get("douyin")
+    pp.min_interval_s = 0.0
+    pp.burst_limit = 999
+    pp.low_rate_rest_s = 1800.0
+    for _ in range(6):
+        p.record("douyin", False)
+
+    # Tripped, and it arms a real cool-down rather than silently refusing.
+    allow, reason = p.allow("douyin")
+    assert allow is False
+    assert "success_rate_low" in reason
+    assert pp.cool_down_until > time.time()
+
+    # Still resting.
+    allow, reason = p.allow("douyin")
+    assert allow is False
+    assert "cool_down" in reason
+
+    # Once the window closes exactly one probe is granted...
+    pp.cool_down_until = 0.0
+    allow, reason = p.allow("douyin")
+    assert allow is True
+    assert "low_rate_probe" in reason
+
+    # ...and a second attempt in the same window is refused again, so a broken
+    # platform cannot be hammered between probes.
+    pp.cool_down_until = 0.0
+    allow, reason = p.allow("douyin")
+    assert allow is False
+    assert "success_rate_low" in reason
+
+@t("pacing: low-success state survives a save/load roundtrip")
+def test_pacing_low_rate_state_persists(tmp_path=None):
+    import tempfile as _tf
+    from core.pacing import PacingController
+    with _tf.TemporaryDirectory() as d:
+        f = Path(d) / "pacing.json"
+        p1 = PacingController(["douyin"])
+        pp1 = p1.get("douyin")
+        pp1.min_interval_s = 0.0
+        pp1.burst_limit = 999
+        for _ in range(6):
+            p1.record("douyin", False)
+        p1.allow("douyin")          # arms the cool-down
+        p1.save(f)
+
+        p2 = PacingController.load(f, ["douyin"])
+        pp2 = p2.get("douyin")
+        assert pp2._low_rate_armed is True
+        assert pp2.cool_down_until > 0
+        # Window elapsed -> the reloaded controller grants the probe.
+        pp2.cool_down_until = 0.0
+        allow, _ = p2.allow("douyin")
+        assert allow is True
+
 @t("pacing: save+load roundtrip")
 def test_pacing_persist():
     with _Tmp() as tmp:
