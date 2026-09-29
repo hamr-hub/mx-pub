@@ -1,0 +1,43 @@
+[project]
+name = "mx-pub"
+version = "0.3.0"
+description = "Multi-platform video publisher (douyin / kuaishou / weixin) over real logged-in Chrome via CDP"
+requires-python = ">=3.10"
+dependencies = [
+    "playwright>=1.40",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7", "ruff>=0.5"]
+
+[project.scripts]
+mxpub = "mxpub:main"
+
+[tool.ruff]
+line-length = 90
+target-version = "py310"
+# archive/ is a frozen snapshot of one-off drivers — not maintained.
+exclude = ["archive", "_benchmark", ".ruff_cache", ".pytest_cache", "__pycache__"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "B", "SIM"]
+ignore = [
+    "E501",    # long lines are handled by the formatter, not the linter
+    "E402",    # batch_publish must sys.path-insert scripts/ before core imports
+    "B008",    # Playwright DSL calls read as "function call in default arg"
+    "SIM105",  # contextlib.suppress is slower than try/except pass in hot paths
+    "B904",    # re-raise style is explicit where it matters
+    # pyupgrade (UP) and isort (I) are deliberately off: they rewrite ~100
+    # lines of a battle-tested publisher for zero functional gain, and I001
+    # would reorder the sys.path-insert-then-import blocks these files rely on.
+]
+
+[tool.ruff.lint.per-file-ignores]
+"batch_publish.py" = ["E402"]
+"mxpub.py" = ["E402"]
+"tests/*" = ["E402"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "-q"

@@ -23,7 +23,6 @@ from __future__ import annotations
 
 import json
 import os
-import sys
 from pathlib import Path
 from typing import Optional
 
@@ -158,10 +157,7 @@ def _call_mock(prompt: str, system: str = "", model: str = "mock") -> str:
             break
 
     # Get the real descriptive content from prompts.csv
-    if video_path:
-        seed = _read_prompt_for_video(video_path) or ""
-    else:
-        seed = ""
+    seed = _read_prompt_for_video(video_path) or "" if video_path else ""
 
     if seed:
         # Use first descriptive phrase (before comma) as title
@@ -191,7 +187,7 @@ def _call_mock(prompt: str, system: str = "", model: str = "mock") -> str:
         "lightning": "lightning", "storm": "storm", "thunder": "thunder",
         "manhattan": "nyc", "tokyo": "tokyo", "shibuya": "shibuya",
         "car": "car", "drift": "drift", "luxury": "luxury",
-        "samurai": "samurai", "duel": "duel", "rain": "rain",
+        "duel": "duel", "rain": "rain",
         "cherry": "sakura", "blossom": "sakura", "timelapse": "timelapse",
         "kyoto": "kyoto", "butterfly": "butterfly", "macro": "macro",
         "aurora": "aurora", "iceland": "iceland", "campfire": "campfire",
@@ -312,7 +308,6 @@ def _read_prompt_for_video(video_path: str) -> Optional[str]:
     Walks up to find a prompts.csv in the same directory. Matches by filename.
     """
     import csv
-    import re
     p = Path(video_path)
     candidates = [p.parent / "prompts.csv", p.parent.parent / "prompts.csv"]
     filename = p.name

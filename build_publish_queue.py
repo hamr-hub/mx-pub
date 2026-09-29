@@ -3,11 +3,15 @@
 Build publish_queue.json: all videos sorted by date desc, with topic_seed from prompts.csv.
 Mark files as published if they appear in publish_state.json history.
 """
-import json
 import csv
-import re
+import sys
 from pathlib import Path
 from datetime import datetime
+
+HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE / "scripts"))
+
+from core.jsonio import atomic_write_json, read_json_safe  # noqa: E402
 
 HERE = Path(__file__).resolve().parent
 IMAGES_DIR = Path("/Users/hyx/ssd/codespace/personal/images")
@@ -30,8 +34,8 @@ def extract_hashtags(prompt_text: str, max_tags: int = 5) -> list:
     """Generate hashtags from prompt keywords."""
     if not prompt_text:
         return []
-    # Take nouns / key phrases
-    words = re.findall(r'\b[a-zA-Z]{4,}\b', prompt_text.lower())
+    # Only the curated keyword list produces tags — the free-word regex this
+    # used to run was dead code, and reviving it would change live hashtags.
     seen = set()
     tags = []
     keywords = ["cinematic", "macro", "wildlife", "timelapse", "duel", "battle", "fire",
@@ -103,9 +107,9 @@ def main():
     videos.sort(key=lambda v: v["mtime"], reverse=True)
 
     # Mark already-published videos from state.json history
-    if STATE_FILE.exists():
+    state = read_json_safe(STATE_FILE, default={})
+    if isinstance(state, dict):
         try:
-            state = json.loads(STATE_FILE.read_text())
             for hist in state.get("history", []):
                 # Skip if not ok status
                 if hist.get("status") != "ok":
@@ -130,7 +134,7 @@ def main():
         "remaining": sum(1 for v in videos if not all(p in v["published"] for p in ["xhs", "douyin", "kuaishou", "weixin"])),
         "videos": videos,
     }
-    QUEUE_FILE.write_text(json.dumps(queue, indent=2, ensure_ascii=False))
+    atomic_write_json(QUEUE_FILE, queue)   # never leave a truncated queue
     print(f"Built queue with {len(videos)} videos")
     print(f"  Total: {queue['total']}")
     print(f"  Published: {queue['published']}")

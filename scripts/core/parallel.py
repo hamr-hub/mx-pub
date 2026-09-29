@@ -7,7 +7,7 @@ Target: ≤30s total wall time even when individual platforms take 2+ min.
 """
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import time
-from typing import Any, Callable, Optional
+from typing import Optional
 
 import sys
 from pathlib import Path
@@ -16,10 +16,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from publisher import PublishResult, track, _get_module, CDP_URL_DEFAULT
 from core.browser import (
     connect_chrome,
-    find_file_input,
     find_platform_page,
-    fill_first,
-    click_publish_button,
     is_transient_error,
 )
 

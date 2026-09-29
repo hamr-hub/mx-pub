@@ -1,0 +1,142 @@
+{
+  "batch": "20260915_content_themed",
+  "created": "2026-09-15",
+  "note": "Content-themed curation. Collections group by SUBJECT, never by production date. Every clip was verified absent from douyin/kuaishou/weixin server truth before queueing (scripts/build_themed_queue.py). Series episodes use the 20260826 render batch and must publish in episode order.",
+  "images_root": "/Volumes/ssd/codespace/personal/images",
+  "collections": {
+    "奇幻视界": "科幻与异域奇观:火星、圣像、歌者、灯塔与荧光溶洞",
+    "自然之诗": "微距与四季:水滴、红叶、篝火",
+    "人间烟火": "人间故事:渔夫、提灯孩子、吴哥夜行",
+    "归家之旅": "连续短片:旅人的归家之路",
+    "灯塔守护者": "连续短片:老守塔人的一夜",
+    "一粒种子的旅程": "连续短片与延时:从播种到破土"
+  },
+  "videos": [
+    {
+      "path": "20260912/minimax/video_1.mp4",
+      "collection": "奇幻视界",
+      "title": "火星落日独行",
+      "description": "宇航员独行火星红色荒原,落日把身影拉得很长,每一步都扬起尘烟,远方是殖民地的一点微光。AI生成科幻短片 #火星 #宇航员 #科幻 #AI短片 #宇宙",
+      "hashtags": ["火星", "宇航员", "科幻", "AI短片", "宇宙"]
+    },
+    {
+      "path": "20260912/minimax/video_3.mp4",
+      "collection": "奇幻视界",
+      "title": "圣像修复师·凝眸",
+      "description": "眩晕推镜穿过拥挤月台,拜占庭圣像修复师在长镜头压缩的光影里抬眼,16mm胶片质感。AI生成电影短片 #拜占庭 #修复师 #电影感 #复古 #AI视频",
+      "hashtags": ["拜占庭", "修复师", "电影感", "复古", "AI视频"]
+    },
+    {
+      "path": "20260912/minimax/video_4.mp4",
+      "collection": "奇幻视界",
+      "title": "格陵兰的歌声",
+      "description": "因纽特喉音歌者在拜占庭圣像修复工坊里吟唱,甩镜从眼睛特写推向星河,卡拉瓦乔式明暗。AI生成艺术短片 #因纽特 #吟唱 #世界音乐 #艺术短片 #AI生成",
+      "hashtags": ["因纽特", "吟唱", "世界音乐", "艺术短片", "AI生成"]
+    },
+    {
+      "path": "20260913/minimax/video_3.mp4",
+      "collection": "奇幻视界",
+      "title": "驯马师与灯塔",
+      "description": "无人机绕着灯塔光柱环绕飞行,安达卢西亚驯马师在光束与薄雾间低语,身后是凝固的夜瀑。AI电影感短片 #驯马师 #灯塔 #航拍 #电影感 #AI视频",
+      "hashtags": ["驯马师", "灯塔", "航拍", "电影感", "AI视频"]
+    },
+    {
+      "path": "20260913/minimax/video_4.mp4",
+      "collection": "奇幻视界",
+      "title": "黎明集市的歌者",
+      "description": "安达卢西亚黎明马集,因纽特歌者放声歌唱,时间切片里腾跃的马群被瞬间凝固。油画质感AI短片 #马集 #黎明 #歌者 #异域风情 #AI视频",
+      "hashtags": ["马集", "黎明", "歌者", "异域风情", "AI视频"]
+    },
+    {
+      "path": "20260914/minimax/video_4.mp4",
+      "collection": "奇幻视界",
+      "title": "荧光溶洞深潜",
+      "description": "第一人称潜入发光生物栖居的溶洞,蓝光里鱼群环绕,像潜入一颗外星的心脏。AI生成科幻短片 #潜水 #荧光海 #溶洞 #奇幻 #AI短片",
+      "hashtags": ["潜水", "荧光海", "溶洞", "奇幻", "AI短片"]
+    },
+    {
+      "path": "20260913/minimax/video_1.mp4",
+      "collection": "自然之诗",
+      "title": "一滴水的绽放",
+      "description": "慢动作微距:一滴水珠坠入黎明的黑色湖面,水花皇冠被光凝固,涟漪缓缓向外扩散。AI微距影像 #微距 #水滴 #慢动作 #治愈 #AI生成",
+      "hashtags": ["微距", "水滴", "慢动作", "治愈", "AI生成"]
+    },
+    {
+      "path": "20260912/minimax/video_2.mp4",
+      "collection": "自然之诗",
+      "title": "京都红叶物语",
+      "description": "京都寺院庭院,低垂光柱里枫叶飘落,120帧慢镜与手持漂移,橙红色调如一首秋天的诗。AI生成 #京都 #红叶 #秋天 #日式美学 #AI视频",
+      "hashtags": ["京都", "红叶", "秋天", "日式美学", "AI视频"]
+    },
+    {
+      "path": "20260826/minimax/video_1.mp4",
+      "collection": "人间烟火",
+      "title": "黎明海岸的老人",
+      "description": "粉彩般的黎明海岸,老渔夫沿岸独行、轻轻撒网,海鸥从头顶滑过,安静而有希望。AI生成短片 #渔夫 #黎明 #海边 #治愈系 #AI生成",
+      "hashtags": ["渔夫", "黎明", "海边", "治愈系", "AI生成"]
+    },
+    {
+      "path": "20260826/minimax/video_2.mp4",
+      "collection": "人间烟火",
+      "title": "崖上提灯的孩子",
+      "description": "悬崖上的孩子举着小灯笼,向暮色里归航的渔船挥手,灯塔的光在身后缓缓扫过。AI叙事短片 #提灯 #悬崖 #等待 #回家 #AI短片",
+      "hashtags": ["提灯", "悬崖", "等待", "回家", "AI短片"]
+    },
+    {
+      "path": "20260803/minimax/video_1.mp4",
+      "collection": "人间烟火",
+      "title": "吴哥窟夜行长廊",
+      "description": "火把照亮吴哥窟千年石柱长廊,镜头向前穿行,橙衣僧人擦肩而过,萤火在湿热空气里漂浮。AI生成 #吴哥窟 #古迹 #火把 #旅行 #AI视频",
+      "hashtags": ["吴哥窟", "古迹", "火把", "旅行", "AI视频"]
+    },
+    {
+      "path": "series/homecoming_20260826_01/ep_001/video.mp4",
+      "collection": "归家之旅",
+      "title": "归家之旅·启程",
+      "description": "连续短片《归家之旅》第1集:旅人轻轻合上小屋的门,独自踏上长路。AI连续叙事短片 #归家之旅 #连续短片 #旅人 #第一集 #AI生成",
+      "hashtags": ["归家之旅", "连续短片", "旅人", "第一集", "AI生成"]
+    },
+    {
+      "path": "series/homecoming_20260826_01/ep_002/video.mp4",
+      "collection": "归家之旅",
+      "title": "归家之旅·长路",
+      "description": "连续短片《归家之旅》第2集:黎明的长路上,旅人提着箱子前行,呼吸在冷空气里结成薄雾。AI连续叙事短片 #归家之旅 #连续短片 #黎明 #第二集 #AI生成",
+      "hashtags": ["归家之旅", "连续短片", "黎明", "第二集", "AI生成"]
+    },
+    {
+      "path": "series/lighthouse_20260826_02/ep_001/video.mp4",
+      "collection": "灯塔守护者",
+      "title": "灯塔守护者·上塔",
+      "description": "连续短片《灯塔守护者》第1集:老守塔人提着灯,独自走上旋梯,夜航之光即将点亮。AI连续叙事短片 #灯塔守护者 #连续短片 #守塔人 #第一集",
+      "hashtags": ["灯塔守护者", "连续短片", "守塔人", "第一集"]
+    },
+    {
+      "path": "series/lighthouse_20260826_02/ep_002/video.mp4",
+      "collection": "灯塔守护者",
+      "title": "灯塔守护者·点灯",
+      "description": "连续短片《灯塔守护者》第2集:他擦亮黄铜透镜,窗外海雾弥漫,灯束苏醒,缓缓扫过海面。AI连续叙事短片 #灯塔守护者 #连续短片 #海雾 #第二集",
+      "hashtags": ["灯塔守护者", "连续短片", "海雾", "第二集"]
+    },
+    {
+      "path": "series/seedling_20260826_03/ep_001/video.mp4",
+      "collection": "一粒种子的旅程",
+      "title": "一粒种子·播种",
+      "description": "连续短片《一粒种子的旅程》第1集:盛夏干裂的后院土地上,孩子的手轻轻放入一粒种子。AI连续叙事短片 #一粒种子 #连续短片 #播种 #治愈",
+      "hashtags": ["一粒种子", "连续短片", "播种", "治愈"]
+    },
+    {
+      "path": "series/seedling_20260826_03/ep_002/video.mp4",
+      "collection": "一粒种子的旅程",
+      "title": "一粒种子·生长",
+      "description": "连续短片《一粒种子的旅程》第2集:午后阴凉里,孩子把种子按进泥土,微微一笑,雨快要来了。AI连续叙事短片 #一粒种子 #连续短片 #生长 #第二集",
+      "hashtags": ["一粒种子", "连续短片", "生长", "第二集"]
+    },
+    {
+      "path": "20260826/minimax/video_5.mp4",
+      "collection": "一粒种子的旅程",
+      "title": "破土而出的瞬间",
+      "description": "延时微距:一粒种子顶开雨后干裂的泥土,第一片嫩叶托着露珠,在逆光里缓缓舒展。生命力,AI延时影像 #破土 #种子 #延时摄影 #生命力 #AI生成",
+      "hashtags": ["破土", "种子", "延时摄影", "生命力", "AI生成"]
+    }
+  ]
+}

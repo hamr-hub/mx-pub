@@ -21,6 +21,7 @@ from publisher import PublishResult
 from core.watch import (ApiWatch, await_publish, is_fatal_connection_error,
                         wait_dom)
 from core.dialog_guard import attach_dialog_guard, clear_contenteditable
+from core.covers import make_covers
 from mx_collections import attach_douyin_to_collection
 
 CDP_URL_DEFAULT = "http://127.0.0.1:9222"
@@ -101,6 +102,102 @@ def _set_ai_generated_declaration(page) -> bool:
         return False
 
 
+def _click_exact(page, text: str, *, min_w: float = 50,
+                  center: bool = False) -> bool:
+    """Click the most specific visible element with exact text.
+
+    center=True restricts to elements centered in the viewport (used for the
+    vertical-cover guide popup, whose label also exists as a tab/footer)."""
+    js = r"""([text, minW, center]) => {
+      const vw = window.innerWidth;
+      const hits = [];
+      for (const el of document.querySelectorAll('button, div, span')) {
+        if ((el.innerText || '').trim() !== text) continue;
+        const r = el.getBoundingClientRect();
+        if (!r.width || !r.height || r.width < minW) continue;
+        const centered = Math.abs((r.x + r.width / 2) - vw / 2) < vw / 4;
+        if (center && !centered) continue;
+        hits.push({el, depth: (() => { let n = el, d = 0;
+          while (n.parentElement && d < 20) { n = n.parentElement; d++; }
+          return d; })(), w: r.width});
+      }
+      if (!hits.length) return false;
+      // leaf-most, then smallest width (the action button among containers)
+      hits.sort((a, b) => a.depth - b.depth || a.w - b.w);
+      hits[0].el.scrollIntoView({block: 'center'});
+      hits[0].el.click();
+      return true;
+    }"""
+    return bool(page.evaluate(js, [text, min_w, center]))
+
+
+def _direct_cover_input(page):
+    """Locator for the direct '上传封面' zone's hidden input.
+
+    Four hidden image inputs exist in the cover modal; the first two belong to
+    '生成参考图' (AI reference). The direct-cover zone is the one whose
+    container carries '点击上传文件或拖拽文件到这里'."""
+    idx = page.evaluate(r"""() => {
+      const ins = Array.from(document.querySelectorAll(
+        '.semi-upload-hidden-input, .semi-upload-hidden-input-replace'));
+      for (let i = 0; i < ins.length; i++) {
+        let n = ins[i];
+        for (let j = 0; j < 8; j++) {
+          n = n.parentElement;
+          if (!n) break;
+          if ((n.innerText || '').includes('点击上传文件或拖拽文件到这里'))
+            return i;
+        }
+      }
+      return -1;
+    }""")
+    if idx < 0:
+        return None
+    return page.locator(
+        ".semi-upload-hidden-input, .semi-upload-hidden-input-replace").nth(idx)
+
+
+def _set_covers(page, cover_h: str, cover_v: str) -> bool:
+    """Upload custom horizontal (4:3) + vertical (3:4) covers.
+
+    Proven flow (2026-09 analysis): open modal -> direct-upload h -> 完成 ->
+    guide popup 设置竖封面 -> direct-upload v -> 完成/暂不设置. Both files commit
+    even when the second guide popup is dismissed with 暂不设置."""
+    try:
+        _click_exact(page, "选择封面", min_w=80)
+        time.sleep(2.5)
+        h_inp = _direct_cover_input(page)
+        if h_inp is None:
+            print("[douyin] cover: direct input not found")
+            return False
+        h_inp.set_input_files(cover_h)
+        time.sleep(2.5)
+        _click_exact(page, "完成", min_w=60)
+        time.sleep(1.5)
+        # Vertical-cover guide popup; its action switches to the vertical tab.
+        _click_exact(page, "设置竖封面", min_w=80, center=True)
+        time.sleep(2.0)
+        v_inp = _direct_cover_input(page)
+        if v_inp is not None:
+            v_inp.set_input_files(cover_v)
+            time.sleep(2.5)
+        done = _click_exact(page, "完成", min_w=60)
+        if not done:
+            # Guide re-popup: 暂不设置 closes the modal; v already committed.
+            _click_exact(page, "暂不设置", min_w=60, center=True)
+        time.sleep(2.0)
+        remaining = page.evaluate(r"""() => Array.from(
+          document.querySelectorAll('div, button, span'))
+          .filter(e => (e.innerText || '').trim() === '选择封面'
+              && e.getBoundingClientRect().width > 80).length""")
+        ok = remaining == 0
+        print(f"[douyin] covers set h+v: {ok}")
+        return ok
+    except Exception as e:
+        print(f"[douyin] covers skipped: {e}")
+        return False
+
+
 def _add_topics(page, topics: list) -> None:
     """Type each '#word' in the editor and accept the first suggestion (Enter)."""
     for word in topics[:3]:
@@ -161,11 +258,7 @@ def _publish_api_ok(data) -> bool:
     """Real create responses carry the new work id; config fetches don't."""
     if not isinstance(data, dict):
         return False
-    if (data.get("status_code") in (0, None) or data.get("statusCode") in (0, None)) \
-            and (data.get("item_id") or data.get("aweme_id")
-                 or data.get("itemId") or data.get("awemeId")):
-        return True
-    return False
+    return bool((data.get("status_code") in (0, None) or data.get("statusCode") in (0, None)) and (data.get("item_id") or data.get("aweme_id") or data.get("itemId") or data.get("awemeId")))
 
 
 def publish_via_api(*, title, description, video, topics=None, location=None, **kwargs) -> PublishResult:
@@ -211,6 +304,12 @@ def publish_on_page(page, *, title, description, video, topics=None, location=No
         return PublishResult("douyin", "fail", method="cdp", error=f"fill_form: {e}")
 
     _set_ai_generated_declaration(page)
+
+    try:
+        cover_h, cover_v = make_covers(video)
+        _set_covers(page, cover_h, cover_v)
+    except Exception as e:
+        print(f"[douyin] cover generation skipped: {e}")
 
     if kwargs.get("collection"):
         try:

@@ -37,3 +37,18 @@ venv/
 .vscode/
 *.swp
 *.swo
+artifacts/
+
+# Adaptive pacing / risk state (learned at runtime, machine-local)
+pacing_state.json
+pacing_state.json.tmp
+
+# Self-learning event log + generated insights (regenerate with `mxpub insights`)
+publish_events.jsonl
+publish_events.jsonl.*
+insights_report.md
+insights_report.json
+
+# Tool caches
+.pytest_cache/
+.ruff_cache/

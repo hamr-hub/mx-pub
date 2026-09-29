@@ -140,8 +140,9 @@ def click_publish_button(page, button_text: str = "发布",
     clicked = page.evaluate(js_click, [button_text, list(primary_class_patterns)])
     if clicked != 'not_found':
         return clicked
-    # Last resort: Playwright locator
-    try:
+    # Last resort: Playwright locator. Kept as a separate `if` so the
+    # comment above stays attached to the fallback tier it explains.
+    try:  # noqa: SIM103
         btn = page.get_by_role("button", name=button_text).first
         if btn.count() > 0:
             btn.click(timeout=timeout)
@@ -176,3 +177,21 @@ def is_transient_error(err: str) -> bool:
         return False
     err_lower = err.lower()
     return any(pat in err_lower for pat in TRANSIENT_ERROR_PATTERNS)
+
+# ---- Next-gen wrapper: defer to the new error classifier when available ----
+def is_transient_error_smart(err: str, *, status: str = "",
+                              platform: str = "") -> bool:
+    """Decide retry-worthiness using core.errors.classify() when available,
+    falling back to is_transient_error() if not.
+
+    True if the classifier says TRANSIENT/RECOVERABLE/PLATFORM/UNKNOWN AND
+    not a fatal connection / content rejection / account ban.
+    """
+    try:
+        from core.errors import classify, ErrorClass
+        c = classify(err, status=status, platform=platform)
+    except Exception:
+        return is_transient_error(err)
+    if c.is_fatal_connection or c.is_ban_signal:
+        return False
+    return c.cls not in (ErrorClass.CONTENT, ErrorClass.FATAL)

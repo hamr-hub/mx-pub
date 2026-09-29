@@ -1,0 +1,693 @@
+{
+  "batch": "20260929_post915_content",
+  "created": "2026-09-29",
+  "images_root": "/Volumes/ssd/codespace/personal/images",
+  "collections": {
+    "人间食色": "烟火人间，皆在慢镜里的一餐一饮。",
+    "自然奇境": "极光、雪原、花海与迁飞的蝶，自然最温柔的瞬间。",
+    "浪客剑影": "竹林雨、霓虹夜，刀光里的东方江湖。",
+    "舞台浮生": "舞台上下的舞者、歌者与穿行人间的身影。",
+    "画中光影": "走进名画光影里的人与他们的时代。",
+    "奇境漫游": "从飞艇到古寺，去往远方的奇境漫游。"
+  },
+  "videos": [
+    {
+      "path": "20260916/minimax/video_1.mp4",
+      "collection": "舞台浮生",
+      "title": "侍者穿行宴会大厅长镜",
+      "description": "吊灯唯一主光，侍者一镜到底穿行于喧闹宴席，面孔从镜头前掠过。",
+      "hashtags": [
+        "长镜头",
+        "电影感"
+      ]
+    },
+    {
+      "path": "20260916/minimax/video_2.mp4",
+      "collection": "自然奇境",
+      "title": "京都禅寺樱花盛开飘落",
+      "description": "延时镜头里樱花在京都枯山水庭院绽放又飘落，石灯笼静立前景。",
+      "hashtags": [
+        "樱花",
+        "延时摄影",
+        "治愈"
+      ]
+    },
+    {
+      "path": "20260916/minimax/video_3.mp4",
+      "collection": "自然奇境",
+      "title": "冰岛小屋上空极光飞舞",
+      "description": "北极光在偏远冰岛小屋上空起舞，炊烟袅袅，窗内一盏暖灯。",
+      "hashtags": [
+        "极光",
+        "冰岛",
+        "星空"
+      ]
+    },
+    {
+      "path": "20260916/minimax/video_4.mp4",
+      "collection": "画中光影",
+      "title": "天目釉碗旁拜占庭女领唱",
+      "description": "油画质感的拜占庭女领唱，与曜变天目釉碗、花岗岩背景融为一体。",
+      "hashtags": [
+        "油画质感",
+        "人像"
+      ]
+    },
+    {
+      "path": "20260916/minimax/video_5.mp4",
+      "collection": "人间食色",
+      "title": "深夜拉面的热气升腾",
+      "description": "240 帧慢镜下筷子夹起拉面，汤汁悬在半空，热气清晰可见。",
+      "hashtags": [
+        "拉面",
+        "美食",
+        "慢动作"
+      ]
+    },
+    {
+      "path": "20260917/minimax/video_1.mp4",
+      "collection": "人间食色",
+      "title": "大厨慢切蓝鳍金枪鱼刺身",
+      "description": "寿司主厨慢刀切蓝鳍金枪鱼，刀刃映顶光，赤红鱼肉油润发亮。",
+      "hashtags": [
+        "刺身",
+        "日料",
+        "慢动作"
+      ]
+    },
+    {
+      "path": "20260917/minimax/video_2.mp4",
+      "collection": "自然奇境",
+      "title": "极光下温暖的山间小屋",
+      "description": "极光漫过冰岛夜空，山间小屋透出暖光，烟囱升起一缕炊烟。",
+      "hashtags": [
+        "极光",
+        "冰岛"
+      ]
+    },
+    {
+      "path": "20260917/minimax/video_3.mp4",
+      "collection": "自然奇境",
+      "title": "北极熊崽滑下阿拉斯加雪坡",
+      "description": "BBC 行星地球质感，北极熊幼崽滑下阿拉斯加雪堆，母亲在身后守望。",
+      "hashtags": [
+        "北极熊",
+        "野生动物",
+        "可爱"
+      ]
+    },
+    {
+      "path": "20260917/minimax/video_4.mp4",
+      "collection": "画中光影",
+      "title": "维米尔风格倒牛奶少女",
+      "description": "纯黑背景前的维米尔式倒牛奶少女，透明玻璃杯，胶片颗粒，柔和静谧。",
+      "hashtags": [
+        "名画复刻",
+        "人像",
+        "光影"
+      ]
+    },
+    {
+      "path": "20260917/minimax/video_5.mp4",
+      "collection": "人间食色",
+      "title": "红酒入杯的慢镜瞬间",
+      "description": "极致慢镜中红酒注入酒杯，酒泪沿杯壁滑落，背光穿透酒红，广告级质感。",
+      "hashtags": [
+        "红酒",
+        "慢动作",
+        "广告大片"
+      ]
+    },
+    {
+      "path": "20260918/minimax/video_1.mp4",
+      "collection": "人间食色",
+      "title": "拿坡里柴火窑烤披萨",
+      "description": "柴火披萨窑内火焰舔着穹顶，马苏里拉芝士翻滚冒泡，披萨即将出炉。",
+      "hashtags": [
+        "披萨",
+        "窑烤",
+        "美食"
+      ]
+    },
+    {
+      "path": "20260918/minimax/video_2.mp4",
+      "collection": "自然奇境",
+      "title": "北极光与木屋的炊烟",
+      "description": "北极光笼罩偏远木屋，炊烟与星轨交织，一扇窗亮着温暖灯火。",
+      "hashtags": [
+        "极光",
+        "星空",
+        "治愈"
+      ]
+    },
+    {
+      "path": "20260918/minimax/video_3.mp4",
+      "collection": "人间食色",
+      "title": "勺子敲碎焦糖布蕾外壳",
+      "description": "勺子敲开焦糖布蕾脆壳，露出内里香草籽，俯拍柔光甜点特写。",
+      "hashtags": [
+        "甜品",
+        "焦糖布蕾",
+        "治愈"
+      ]
+    },
+    {
+      "path": "20260918/minimax/video_4.mp4",
+      "collection": "画中光影",
+      "title": "重返地球的苏联宇航员",
+      "description": "自然窗光下重返地球的苏联宇航员，雪色柔光，胶片质感，安静而疲惫。",
+      "hashtags": [
+        "宇航员",
+        "胶片质感",
+        "人像"
+      ]
+    },
+    {
+      "path": "20260918/minimax/video_5.mp4",
+      "collection": "人间食色",
+      "title": "铁板牛排火焰燃烧瞬间",
+      "description": "慢镜牛排火焰料理，蓝焰舔过焦壳，黄油在铁锅上焦化，火星飞溅。",
+      "hashtags": [
+        "牛排",
+        "火焰",
+        "慢动作"
+      ]
+    },
+    {
+      "path": "20260919/minimax/video_1.mp4",
+      "collection": "人间食色",
+      "title": "柴火窑里沸腾的玛格丽特",
+      "description": "窑火舔过穹顶，玛格丽特披萨芝士沸腾，拿坡里街头烟火气。",
+      "hashtags": [
+        "披萨",
+        "窑烤",
+        "街头美食"
+      ]
+    },
+    {
+      "path": "20260919/minimax/video_2.mp4",
+      "collection": "浪客剑影",
+      "title": "雨中竹林蒙面武士对决",
+      "description": "雨中竹林，蒙面武士双双拔刀，风声拂过竹梢，对峙之后骤然交锋。",
+      "hashtags": [
+        "武士",
+        "竹林",
+        "武侠"
+      ]
+    },
+    {
+      "path": "20260919/minimax/video_3.mp4",
+      "collection": "舞台浮生",
+      "title": "宴会厅一镜到底的穿梭",
+      "description": "斯坦尼康紧随侍者，在吊灯单光下穿过拥挤宴席，长镜一气呵成。",
+      "hashtags": [
+        "长镜头",
+        "电影感"
+      ]
+    },
+    {
+      "path": "20260919/minimax/video_4.mp4",
+      "collection": "画中光影",
+      "title": "莫卧儿细密画中的怀石",
+      "description": "莫卧儿细密画匠人置身日式怀石宴席之间，移轴微距，雾气弥漫。",
+      "hashtags": [
+        "细密画",
+        "移轴",
+        "艺术"
+      ]
+    },
+    {
+      "path": "20260919/minimax/video_5.mp4",
+      "collection": "舞台浮生",
+      "title": "废弃剧院芭蕾独舞凌空",
+      "description": "废弃剧院舞台，一束光里尘埃浮动，芭蕾舞者慢镜跃起，足尖悬空。",
+      "hashtags": [
+        "芭蕾",
+        "舞蹈",
+        "光影"
+      ]
+    },
+    {
+      "path": "20260920/minimax/video_1.mp4",
+      "collection": "舞台浮生",
+      "title": "光柱尘埃中的芭蕾跳跃",
+      "description": "废弃剧院一束光柱，尘埃与芭蕾舞者同舞，慢动作凌空一跃。",
+      "hashtags": [
+        "芭蕾",
+        "舞蹈",
+        "慢动作"
+      ]
+    },
+    {
+      "path": "20260920/minimax/video_2.mp4",
+      "collection": "自然奇境",
+      "title": "极光笼罩的冰岛夜晚",
+      "description": "冰岛夜晚极光缓缓舞动，小屋炊烟与星轨相接，窗灯温暖。",
+      "hashtags": [
+        "极光",
+        "冰岛",
+        "夜晚"
+      ]
+    },
+    {
+      "path": "20260920/minimax/video_3.mp4",
+      "collection": "舞台浮生",
+      "title": "烟雾俱乐部爵士女伶",
+      "description": "烟雾缭绕的俱乐部舞台，聚光截住香烟烟雾，镜头推向爵士女伶的脸。",
+      "hashtags": [
+        "爵士",
+        "现场音乐",
+        "复古"
+      ]
+    },
+    {
+      "path": "20260920/minimax/video_4.mp4",
+      "collection": "画中光影",
+      "title": "悬崖雪光中美索美洲队长",
+      "description": "喜马拉雅悬崖雪光中，美索美洲球赛队长侧身而立，浅景深胶片质感。",
+      "hashtags": [
+        "人像",
+        "胶片质感",
+        "光影"
+      ]
+    },
+    {
+      "path": "20260920/minimax/video_5.mp4",
+      "collection": "自然奇境",
+      "title": "母熊注视下滑雪的幼崽",
+      "description": "柔和阴天光里，北极熊幼崽滑下雪堆，母亲静静注视，纪录片质感。",
+      "hashtags": [
+        "北极熊",
+        "野生动物",
+        "治愈"
+      ]
+    },
+    {
+      "path": "20260921/ark_agent_plan/video_1.mp4",
+      "collection": "舞台浮生",
+      "title": "剧院废墟上的天鹅独舞",
+      "description": "十二秒完整长镜，废弃剧院废墟之上，芭蕾舞者如天鹅独自起舞。",
+      "hashtags": [
+        "芭蕾",
+        "舞蹈",
+        "长镜"
+      ]
+    },
+    {
+      "path": "20260921/ark_agent_plan/video_2.mp4",
+      "collection": "人间食色",
+      "title": "手冲咖啡闷蒸注水慢镜",
+      "description": "俯拍手冲咖啡闷蒸，热水慢镜击中粉层，蒸汽在逆光中袅袅回旋。",
+      "hashtags": [
+        "咖啡",
+        "手冲",
+        "慢动作"
+      ]
+    },
+    {
+      "path": "20260921/minimax/video_1.mp4",
+      "collection": "舞台浮生",
+      "title": "聚光灯下芭蕾足尖起舞",
+      "description": "废弃剧院聚光灯里尘埃浮动，芭蕾舞者足尖点地，慢镜跃起。",
+      "hashtags": [
+        "芭蕾",
+        "足尖",
+        "光影"
+      ]
+    },
+    {
+      "path": "20260921/minimax/video_2.mp4",
+      "collection": "人间食色",
+      "title": "玻璃壶里咖啡粉的闷蒸",
+      "description": "透明玻璃壶中热水浇下，咖啡粉缓缓闷蒸膨胀，蒸汽逆光卷曲。",
+      "hashtags": [
+        "咖啡",
+        "手冲",
+        "治愈"
+      ]
+    },
+    {
+      "path": "20260921/minimax/video_3.mp4",
+      "collection": "画中光影",
+      "title": "雨幕中拜占庭风格女子",
+      "description": "拜占庭风格女子立于雨幕之中，广角与雨丝交织，油画般沉静。",
+      "hashtags": [
+        "油画质感",
+        "人像",
+        "雨天"
+      ]
+    },
+    {
+      "path": "20260921/minimax/video_4.mp4",
+      "collection": "自然奇境",
+      "title": "雪原上北极熊宝宝嬉戏",
+      "description": "阿拉斯加雪原上北极熊宝宝嬉戏滑下，母亲在背景中温柔守望。",
+      "hashtags": [
+        "北极熊",
+        "幼崽",
+        "可爱"
+      ]
+    },
+    {
+      "path": "20260921/minimax/video_5.mp4",
+      "collection": "自然奇境",
+      "title": "冰岛极光与星空同框",
+      "description": "极光在冰岛小屋上空流动，炊烟、星轨与一扇暖窗同框。",
+      "hashtags": [
+        "极光",
+        "星空",
+        "冰岛"
+      ]
+    },
+    {
+      "path": "20260922/minimax/video_1.mp4",
+      "collection": "画中光影",
+      "title": "秦兵马俑修复师侧影",
+      "description": "秦兵马俑修复师在星轨般的光尘中低头工作，胶片颗粒，雾气微茫。",
+      "hashtags": [
+        "兵马俑",
+        "修复师",
+        "匠人"
+      ]
+    },
+    {
+      "path": "20260922/minimax/video_2.mp4",
+      "collection": "舞台浮生",
+      "title": "舞台聚光里的爵士歌者",
+      "description": "聚光灯穿过管弦乐团推向爵士歌者，烟雾在光柱里缓缓旋转。",
+      "hashtags": [
+        "爵士",
+        "舞台",
+        "复古"
+      ]
+    },
+    {
+      "path": "20260922/minimax/video_3.mp4",
+      "collection": "奇境漫游",
+      "title": "黄铜时代飞艇领航员",
+      "description": "黄铜时代飞艇领航员凭舷窗远眺，黄叶、胶片色调与远方海岸线。",
+      "hashtags": [
+        "飞艇",
+        "复古",
+        "冒险"
+      ]
+    },
+    {
+      "path": "20260922/minimax/video_4.mp4",
+      "collection": "浪客剑影",
+      "title": "竹林雨幕下的拔刀对峙",
+      "description": "雨幕竹林风声萧萧，两位蒙面武士拔刀对峙，空气凝住。",
+      "hashtags": [
+        "武士",
+        "竹林",
+        "对峙"
+      ]
+    },
+    {
+      "path": "20260922/minimax/video_5.mp4",
+      "collection": "自然奇境",
+      "title": "墨西哥森林帝王蝶迁徙",
+      "description": "墨西哥森林中成千上万帝王蝶缓缓迁飞，阳光穿过林梢，长焦压缩。",
+      "hashtags": [
+        "帝王蝶",
+        "迁徙",
+        "自然"
+      ]
+    },
+    {
+      "path": "20260923/minimax/video_1.mp4",
+      "collection": "画中光影",
+      "title": "紫色暮光中归乡宇航员",
+      "description": "紫橙色调的普罗旺斯薰衣草田间，归乡宇航员如在梦中，雾光弥散。",
+      "hashtags": [
+        "宇航员",
+        "薰衣草",
+        "梦幻"
+      ]
+    },
+    {
+      "path": "20260923/minimax/video_2.mp4",
+      "collection": "舞台浮生",
+      "title": "街头魔术师纸牌慢镜展开",
+      "description": "街头魔术师为惊呼的人群表演纸牌，俯拍纸牌在鹅卵石上慢镜散开。",
+      "hashtags": [
+        "魔术",
+        "纸牌",
+        "街头"
+      ]
+    },
+    {
+      "path": "20260923/minimax/video_3.mp4",
+      "collection": "画中光影",
+      "title": "卡拉瓦乔牌局老千光影",
+      "description": "卡拉瓦乔式明暗光下的牌局老千，移轴胶片，体积光尘埃浮动。",
+      "hashtags": [
+        "卡拉瓦乔",
+        "名画复刻",
+        "光影"
+      ]
+    },
+    {
+      "path": "20260923/minimax/video_4.mp4",
+      "collection": "舞台浮生",
+      "title": "二十年代烟嗓爵士现场",
+      "description": "1920 年代烟雾俱乐部，爵士女伶烟嗓低回，镜头穿过乐团缓缓推近。",
+      "hashtags": [
+        "爵士",
+        "复古",
+        "现场"
+      ]
+    },
+    {
+      "path": "20260923/minimax/video_5.mp4",
+      "collection": "人间食色",
+      "title": "大师手中捏出的小笼褶",
+      "description": "240 帧慢镜里主厨双手捏出小笼包褶，面粉粉尘在窗光里悬浮。",
+      "hashtags": [
+        "小笼包",
+        "慢动作",
+        "面点"
+      ]
+    },
+    {
+      "path": "20260924/minimax/video_1.mp4",
+      "collection": "浪客剑影",
+      "title": "雨夜赛博朋克武士特写",
+      "description": "雨夜霓虹中的赛博朋克武士，精致甲胄与武士刀，冷峻表情特写。",
+      "hashtags": [
+        "赛博朋克",
+        "武士",
+        "雨夜"
+      ]
+    },
+    {
+      "path": "20260924/minimax/video_2.mp4",
+      "collection": "人间食色",
+      "title": "窑火披萨出炉的一瞬间",
+      "description": "柴火窑火焰正旺，芝士沸腾的披萨被长铲取出，拿坡里夜色温柔。",
+      "hashtags": [
+        "披萨",
+        "窑烤",
+        "出炉"
+      ]
+    },
+    {
+      "path": "20260924/minimax/video_3.mp4",
+      "collection": "画中光影",
+      "title": "霍普风格深夜值班护士",
+      "description": "霍普式孤独光影中的深夜值班护士，柏树与广角 HDR，单一主光。",
+      "hashtags": [
+        "霍普",
+        "名画复刻",
+        "孤独"
+      ]
+    },
+    {
+      "path": "20260924/minimax/video_4.mp4",
+      "collection": "舞台浮生",
+      "title": "水晶灯下人流中的长镜",
+      "description": "水晶灯单光下侍者穿行拥挤宴席，长镜掠过一张张近在咫尺的脸。",
+      "hashtags": [
+        "长镜头",
+        "宴会",
+        "电影感"
+      ]
+    },
+    {
+      "path": "20260924/minimax/video_6.mp4",
+      "collection": "人间食色",
+      "title": "勺子切开熔岩巧克力蛋糕",
+      "description": "银勺慢镜切开熔岩巧克力蛋糕，熔心缓缓流出，黑石板顶光特写。",
+      "hashtags": [
+        "巧克力",
+        "甜品",
+        "慢动作"
+      ]
+    },
+    {
+      "path": "20260925/minimax/video_1.mp4",
+      "collection": "画中光影",
+      "title": "冰湖边秦俑修复师凝视",
+      "description": "镜面冰湖之畔，秦兵马俑修复师侧身凝视，电影轮廓光，静谧深沉。",
+      "hashtags": [
+        "兵马俑",
+        "修复师",
+        "冰湖"
+      ]
+    },
+    {
+      "path": "20260925/minimax/video_2.mp4",
+      "collection": "奇境漫游",
+      "title": "火把照亮吴哥窟夜廊",
+      "description": "夜色中火把照亮吴哥窟长廊，镜头沿石柱向前，橙衣僧侣与萤火虫掠过。",
+      "hashtags": [
+        "吴哥窟",
+        "火把",
+        "夜廊"
+      ]
+    },
+    {
+      "path": "20260925/minimax/video_3.mp4",
+      "collection": "浪客剑影",
+      "title": "霓虹光下的未来武士",
+      "description": "霓虹薄雾中赛博朋克武士广角而立，甲胄华丽，长刀在手。",
+      "hashtags": [
+        "赛博朋克",
+        "武士",
+        "霓虹"
+      ]
+    },
+    {
+      "path": "20260925/minimax/video_4.mp4",
+      "collection": "浪客剑影",
+      "title": "雨落竹林双雄决战",
+      "description": "雨落竹林，两位蒙面武士对峙之后骤然交锋，竹叶在风中翻飞。",
+      "hashtags": [
+        "武士",
+        "竹林",
+        "雨战"
+      ]
+    },
+    {
+      "path": "20260926/minimax/video_1.mp4",
+      "collection": "画中光影",
+      "title": "薰衣草田间莫卧儿画师",
+      "description": "普罗旺斯薰衣草田间，莫卧儿细密画匠人与刺身摆盘同框，HDR 柔光。",
+      "hashtags": [
+        "细密画",
+        "薰衣草",
+        "艺术"
+      ]
+    },
+    {
+      "path": "20260926/minimax/video_2.mp4",
+      "collection": "人间食色",
+      "title": "热水唤醒咖啡粉的瞬间",
+      "description": "俯拍透明玻璃壶，热水慢镜唤醒咖啡粉，闷蒸鼓起，蒸汽逆光升腾。",
+      "hashtags": [
+        "咖啡",
+        "手冲",
+        "慢动作"
+      ]
+    },
+    {
+      "path": "20260926/minimax/video_3.mp4",
+      "collection": "画中光影",
+      "title": "窗光下细密画匠人凝思",
+      "description": "自然窗光下莫卧儿细密画匠人凝思落笔，移轴浅景深，雾气微茫。",
+      "hashtags": [
+        "细密画",
+        "匠人",
+        "窗光"
+      ]
+    },
+    {
+      "path": "20260926/minimax/video_4.mp4",
+      "collection": "浪客剑影",
+      "title": "竹林风雨中的剑客宿命",
+      "description": "风雨竹林，两位剑客拔刀相向，风声雨声里一场宿命对决。",
+      "hashtags": [
+        "武士",
+        "剑客",
+        "竹林"
+      ]
+    },
+    {
+      "path": "20260926/minimax/video_5.mp4",
+      "collection": "人间食色",
+      "title": "蓝焰炙烤多汁牛排",
+      "description": "蓝焰慢镜舔过多汁牛排，黄油焦化，余烬火星在暗调厨房里飞溅。",
+      "hashtags": [
+        "牛排",
+        "火焰",
+        "炙烤"
+      ]
+    },
+    {
+      "path": "20260926/minimax/video_6.mp4",
+      "collection": "人间食色",
+      "title": "焦糖布蕾下的香草内心",
+      "description": "勺子敲开焦糖脆层，露出香草籽布蕾内心，俯拍柔光甜点特写。",
+      "hashtags": [
+        "焦糖布蕾",
+        "甜品",
+        "治愈"
+      ]
+    },
+    {
+      "path": "20260928/minimax/video_1.mp4",
+      "collection": "画中光影",
+      "title": "雾色柔光里的拜占庭女子",
+      "description": "雾色浅景深中拜占庭风格女子静立，百微对焦层叠，油画般沉静。",
+      "hashtags": [
+        "拜占庭",
+        "油画质感",
+        "人像"
+      ]
+    },
+    {
+      "path": "20260928/minimax/video_2.mp4",
+      "collection": "人间食色",
+      "title": "浓缩咖啡油脂旋涡特写",
+      "description": "意式咖啡机手柄萃取特写，深色油脂螺旋成形，单侧主光，咖啡馆 ASMR。",
+      "hashtags": [
+        "浓缩咖啡",
+        "萃取",
+        "ASMR"
+      ]
+    },
+    {
+      "path": "20260928/minimax/video_3.mp4",
+      "collection": "画中光影",
+      "title": "雨中紫色田间美洲队长",
+      "description": "星轨光与普罗旺斯紫色田间，美索美洲球赛队长在雨中侧立远望。",
+      "hashtags": [
+        "人像",
+        "紫色",
+        "雨天"
+      ]
+    },
+    {
+      "path": "20260928/minimax/video_4.mp4",
+      "collection": "舞台浮生",
+      "title": "江户歌舞伎演员舞台特写",
+      "description": "江户时代歌舞伎演员在电影宽幅舞台上亮相，雾气与变形宽银幕质感。",
+      "hashtags": [
+        "歌舞伎",
+        "舞台",
+        "江户"
+      ]
+    },
+    {
+      "path": "20260928/minimax/video_5.mp4",
+      "collection": "奇境漫游",
+      "title": "吴哥柱廊僧侣与萤火",
+      "description": "火把沿吴哥窟柱廊向前，橙衣僧侣擦肩而过，萤火虫在夜色里明灭。",
+      "hashtags": [
+        "吴哥窟",
+        "僧侣",
+        "萤火"
+      ]
+    }
+  ]
+}

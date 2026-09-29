@@ -1,0 +1,197 @@
+{
+  "batch": "20260915_derivatives",
+  "images_root": "/Users/hyx/codespace/mx-pub/artifacts/derivatives/out",
+  "derivative": true,
+  "collections": {
+    "奇幻视界": "AI 生成的科幻与武侠奇境",
+    "自然之诗": "AI 生成的自然光影瞬间",
+    "人间烟火": "AI 生成的市井与手艺烟火气"
+  },
+  "videos": [
+    {
+      "path": "/Users/hyx/codespace/mx-pub/artifacts/derivatives/out/car_a.mp4",
+      "collection": "奇幻视界",
+      "title": "涩谷雨夜漂移",
+      "description": "雨夜涩谷路口,豪车甩尾过弯,霓虹在湿地上碎成光河。AI生成科幻短片 #跑车 #漂移 #赛博朋克 #雨夜 #AI短片",
+      "hashtags": [
+        "跑车",
+        "漂移",
+        "赛博朋克",
+        "雨夜",
+        "AI短片"
+      ],
+      "topic": "luxury sports car drift on wet Shibuya crossing at night neon reflections",
+      "derivative": true,
+      "sources": [
+        "src_4_206909622983.mp4"
+      ]
+    },
+    {
+      "path": "/Users/hyx/codespace/mx-pub/artifacts/derivatives/out/car_b.mp4",
+      "collection": "奇幻视界",
+      "title": "双视角雨夜漂移",
+      "description": "两台摄影机位的雨夜涩谷漂移,交叉剪辑把霓虹与水雾连成一场梦。AI生成科幻短片 #跑车 #漂移 #赛博朋克 #雨夜 #AI短片",
+      "hashtags": [
+        "跑车",
+        "漂移",
+        "赛博朋克",
+        "雨夜",
+        "AI短片"
+      ],
+      "topic": "luxury sports car drift on wet Shibuya crossing at night neon reflections",
+      "derivative": true,
+      "sources": [
+        "src_4_206909622983.mp4",
+        "src_11_206908610564.mp4"
+      ]
+    },
+    {
+      "path": "/Users/hyx/codespace/mx-pub/artifacts/derivatives/out/samurai_a.mp4",
+      "collection": "奇幻视界",
+      "title": "竹林雨中决斗",
+      "description": "竹林急雨,两位兜帽武士拔刀相向,风过竹梢,胜负只在一瞬。AI生成武侠短片 #武侠 #武士 #竹林 #决斗 #AI短片",
+      "hashtags": [
+        "武侠",
+        "武士",
+        "竹林",
+        "决斗",
+        "AI短片"
+      ],
+      "topic": "hooded samurai duel in bamboo forest during rain drawn swords",
+      "derivative": true,
+      "sources": [
+        "src_14_206899969843.mp4"
+      ]
+    },
+    {
+      "path": "/Users/hyx/codespace/mx-pub/artifacts/derivatives/out/samurai_b.mp4",
+      "collection": "奇幻视界",
+      "title": "竹林剑客双幕",
+      "description": "竹林雨中对决的两次演绎剪在一起:一刀的静止,与满林的风声。AI生成武侠短片 #武侠 #武士 #竹林 #决斗 #AI短片",
+      "hashtags": [
+        "武侠",
+        "武士",
+        "竹林",
+        "决斗",
+        "AI短片"
+      ],
+      "topic": "hooded samurai duel in bamboo forest during rain drawn swords",
+      "derivative": true,
+      "sources": [
+        "src_14_206899969843.mp4",
+        "video_1.mp4"
+      ]
+    },
+    {
+      "path": "/Users/hyx/codespace/mx-pub/artifacts/derivatives/out/sushi_a.mp4",
+      "collection": "人间烟火",
+      "title": "金枪鱼主厨刀工",
+      "description": "主厨手起刀落,蓝鳍金枪鱼大腹被切成均匀的一片,油花在灯下发亮。AI生成美食短片 #美食 #金枪鱼 #刀工 #日料 #AI短片",
+      "hashtags": [
+        "美食",
+        "金枪鱼",
+        "刀工",
+        "日料",
+        "AI短片"
+      ],
+      "topic": "sushi chef slicing bluefin tuna in slow motion close up",
+      "derivative": true,
+      "sources": [
+        "src_5_206909460961.mp4"
+      ]
+    },
+    {
+      "path": "/Users/hyx/codespace/mx-pub/artifacts/derivatives/out/sushi_b.mp4",
+      "collection": "人间烟火",
+      "title": "蓝鳍金枪双刀工",
+      "description": "两次运镜看同一位主厨拆解蓝鳍金枪鱼:刀面反光,鱼肉肌理分毫毕现。AI生成美食短片 #美食 #金枪鱼 #刀工 #日料 #AI短片",
+      "hashtags": [
+        "美食",
+        "金枪鱼",
+        "刀工",
+        "日料",
+        "AI短片"
+      ],
+      "topic": "sushi chef slicing bluefin tuna in slow motion close up",
+      "derivative": true,
+      "sources": [
+        "src_5_206909460961.mp4",
+        "src_8_206909175074.mp4"
+      ]
+    },
+    {
+      "path": "/Users/hyx/codespace/mx-pub/artifacts/derivatives/out/reef_a.mp4",
+      "collection": "自然之诗",
+      "title": "荧光珊瑚海潜行",
+      "description": "镜头滑进午夜的荧光珊瑚礁,蓝绿光点随水流明灭,像海底下起了星雨。AI生成自然短片 #海底世界 #荧光 #珊瑚 #潜水 #AI短片",
+      "hashtags": [
+        "海底世界",
+        "荧光",
+        "珊瑚",
+        "潜水",
+        "AI短片"
+      ],
+      "topic": "underwater dolly through bioluminescent coral reef at night",
+      "derivative": true,
+      "sources": [
+        "src_3_206909758031.mp4"
+      ]
+    },
+    {
+      "path": "/Users/hyx/codespace/mx-pub/artifacts/derivatives/out/reef_b.mp4",
+      "collection": "自然之诗",
+      "title": "荧光深海双幕",
+      "description": "两片荧光珊瑚海的潜行镜头接在一起,蓝光越来越深,直到忘记呼吸。AI生成自然短片 #海底世界 #荧光 #珊瑚 #潜水 #AI短片",
+      "hashtags": [
+        "海底世界",
+        "荧光",
+        "珊瑚",
+        "潜水",
+        "AI短片"
+      ],
+      "topic": "underwater dolly through bioluminescent coral reef at night",
+      "derivative": true,
+      "sources": [
+        "src_3_206909758031.mp4",
+        "src_0_206910229795.mp4"
+      ]
+    },
+    {
+      "path": "/Users/hyx/codespace/mx-pub/artifacts/derivatives/out/hummingbird_a.mp4",
+      "collection": "自然之诗",
+      "title": "朱槿蜂鸟悬停",
+      "description": "蜂鸟在朱槿花前悬停,翅膀化成虚影,细长的喙探入花蕊的一瞬。AI生成自然短片 #蜂鸟 #自然 #微距 #花朵 #AI短片",
+      "hashtags": [
+        "蜂鸟",
+        "自然",
+        "微距",
+        "花朵",
+        "AI短片"
+      ],
+      "topic": "hummingbird hovering at tropical hibiscus flower feeding macro",
+      "derivative": true,
+      "sources": [
+        "src_9_206909096415.mp4"
+      ]
+    },
+    {
+      "path": "/Users/hyx/codespace/mx-pub/artifacts/derivatives/out/hummingbird_b.mp4",
+      "collection": "自然之诗",
+      "title": "蜂鸟悬停双视角",
+      "description": "两个机位看蜂鸟悬停采蜜:翅膀每秒振成雾,花与鸟同时静止在空中。AI生成自然短片 #蜂鸟 #自然 #微距 #花朵 #AI短片",
+      "hashtags": [
+        "蜂鸟",
+        "自然",
+        "微距",
+        "花朵",
+        "AI短片"
+      ],
+      "topic": "hummingbird hovering at tropical hibiscus flower feeding macro",
+      "derivative": true,
+      "sources": [
+        "src_9_206909096415.mp4",
+        "src_1_206910082533.mp4"
+      ]
+    }
+  ]
+}

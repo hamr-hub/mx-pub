@@ -10,6 +10,7 @@ Page map (2026-09 analysis, cp.kuaishou.com/article/publish/video):
 - Upload chain: upload/pre -> fragment -> complete -> upload/finish (~3s on
   short clips). Editor appears immediately after finish.
 """
+import re
 import sys
 import time
 from pathlib import Path
@@ -27,6 +28,17 @@ PUBLISH_URL = "https://cp.kuaishou.com/article/publish/video"
 DESC_MAX = 500
 UPLOAD_TIMEOUT_S = 420
 PUBLISH_TIMEOUT_S = 25
+# KS publish rejects captions with more than 4 topics in total. Queue
+# descriptions already carry "#tag" tails and topics are ALSO inserted as
+# smart-topic chips, so the embedded ones must be stripped first.
+KS_TOPIC_MAX = 4
+
+_HASHTAG_RE = re.compile(r"\s*#[^#\s]+")
+
+
+def _strip_embedded_hashtags(text: str) -> str:
+    """Remove inline '#word' topic tokens (kept for DY/WX, illegal-count on KS)."""
+    return _HASHTAG_RE.sub("", text or "").rstrip(" ,，。;；")
 
 # Observed 2026-09: real create call is .../video/pc/submit; "publish" paths
 # are config endpoints (realize/entrance, publish/time).
@@ -72,11 +84,13 @@ def _fill_form(page, *, title, description, topics) -> None:
     page.keyboard.press("ControlOrMeta+A")
     page.keyboard.press("Delete")
     time.sleep(0.3)
-    text = description or title or ""
+    # Strip embedded "#tag" tokens: together with the smart topics below they
+    # would exceed KS's hard 4-topic cap and fail submit ("发布失败").
+    text = _strip_embedded_hashtags(description or title or "")
     page.keyboard.insert_text(text[:DESC_MAX])
     time.sleep(0.3)
 
-    for word in (topics or [])[:5]:
+    for word in (topics or [])[:KS_TOPIC_MAX]:
         tag = word.lstrip("#")
         page.keyboard.insert_text(f" #{tag}")
         time.sleep(1.0)
@@ -89,6 +103,26 @@ def _fill_form(page, *, title, description, topics) -> None:
         if not picked:
             # Plain "#tag" is auto-recognized as a smart topic on submit — leave as is.
             time.sleep(0.2)
+
+
+def _set_author_declaration(page) -> bool:
+    """作者声明 = 内容为AI生成.
+
+    The form is ant-design even though the shell is element-ui: the placeholder
+    span ("为作品添加补充说明") lives inside .ant-select; clicking it opens the
+    dropdown whose options portal to document.body. 2026-09 analysis."""
+    try:
+        ph = page.get_by_text("为作品添加补充说明", exact=True).first
+        ph.click(timeout=8000)
+        time.sleep(0.8)
+        page.locator(".ant-select-dropdown:visible")
+        opt = page.get_by_text("内容为AI生成", exact=True).last
+        opt.click(timeout=5000)
+        time.sleep(0.4)
+        return True
+    except Exception as e:
+        print(f"[kuaishou] author declaration skipped: {e}")
+        return False
 
 
 def _click_publish(page) -> str:
@@ -119,9 +153,7 @@ def _publish_api_ok(data: dict) -> bool:
         return False
     if data.get("result") == 1 or data.get("status") == 1:
         return True
-    if data.get("error_code") in (0, None) and data.get("error_msg") in (None, "", "成功"):
-        return True
-    return False
+    return bool(data.get("error_code") in (0, None) and data.get("error_msg") in (None, "", "成功"))
 
 
 def publish_via_api(*, title, description, video, topics=None, location=None, **kwargs) -> PublishResult:
@@ -176,6 +208,8 @@ def publish_on_page(page, *, title, description, video, topics=None, location=No
         _fill_form(page, title=title, description=description, topics=topics)
     except Exception as e:
         return PublishResult("kuaishou", "fail", method="cdp", error=f"fill_form: {e}")
+
+    _set_author_declaration(page)
 
     if callable(pre_publish):
         try:

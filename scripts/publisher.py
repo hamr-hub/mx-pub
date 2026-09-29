@@ -13,9 +13,11 @@ Each platform module exposes:
 - publish_on_page(page, **kwargs) -> PublishResult  (new shared mode)
 - publish_via_browser(**kwargs) -> PublishResult  (legacy standalone)
 """
-import json
+import threading
 import time
 from pathlib import Path
+
+from core.jsonio import atomic_write_json, read_json_safe
 
 STATE_FILE = Path(__file__).parent.parent / "publish_state.json"
 CDP_URL_DEFAULT = "http://127.0.0.1:9222"
@@ -42,11 +44,31 @@ class PublishResult:
         }
 
 
+# Guards the read-modify-write cycle in track(). Platform threads call it
+# concurrently (core/parallel.py runs them through a ThreadPoolExecutor), and
+# without this the whole cycle races: lost counter updates, or a JSONDecodeError
+# from reading a half-written file.
+_STATE_LOCK = threading.Lock()
+
+
 def track(platform, result: PublishResult):
-    """Record publish attempt to state file."""
+    """Record a publish attempt to the state file.
+
+    Never raises: telemetry must not be able to fail a publish. A corrupt or
+    unreadable state file is reset rather than propagated.
+    """
+    try:
+        with _STATE_LOCK:
+            _track_locked(platform, result)
+    except Exception:
+        pass
+
+
+def _track_locked(platform, result: PublishResult):
     state = {"platforms": {}, "history": []}
-    if STATE_FILE.exists():
-        state = json.loads(STATE_FILE.read_text())
+    state = read_json_safe(STATE_FILE, default={})
+    if not isinstance(state, dict) or "platforms" not in state:
+        state = {"platforms": {}, "history": []}
 
     if platform not in state["platforms"]:
         state["platforms"][platform] = {"attempts": 0, "successes": 0, "methods": {}, "last_status": None}
@@ -65,7 +87,7 @@ def track(platform, result: PublishResult):
         "tokens_used": result.tokens_used,
     })
     state["history"] = state["history"][-100:]
-    STATE_FILE.write_text(json.dumps(state, indent=2, ensure_ascii=False))
+    atomic_write_json(STATE_FILE, state)
 
 
 def _get_module(platform):
@@ -145,6 +167,9 @@ TRANSIENT_ERROR_PATTERNS = (
     "target page, context or browser has been closed",
     "browser has been closed",
     "connection closed",
+    # Emitted by batch_publish when the CDP transport dies mid-video. It used
+    # to go unrecognised, so those rows were treated as permanent failures.
+    "fatal_connection_closed",
     "navigation interrupted",
     "page crashed",
     "set_input_files",
@@ -162,6 +187,45 @@ def is_transient_error(err: str) -> bool:
         return False
     err_lower = err.lower()
     return any(pat in err_lower for pat in TRANSIENT_ERROR_PATTERNS)
+
+
+# Prefixes the platform modules use for recoverable upload/form errors. They
+# are not literal entries in TRANSIENT_ERROR_PATTERNS because the rest of the
+# message varies, but an upload that timed out is still worth another go.
+RETRYABLE_PREFIXES = ("upload:", "fill_form:", "upload_not_ready")
+
+
+def is_retryable_failure(error: str | None) -> bool:
+    """Whether a failed row is worth re-attempting in a later run.
+
+    Single source of truth for retry eligibility. Two call sites used to
+    disagree: the in-loop retry in batch_publish honoured these prefixes,
+    while needs_publish() consulted only is_transient_error — so a video
+    could be retried twice inside one run and then never again.
+
+    Content rejections, account limits and banned uploads deliberately do not
+    qualify: retrying those is how an account gets flagged.
+
+    The rich classifier in core.errors is authoritative when available: it
+    knows the safety-gate and preflight prefixes, the account/content tables
+    and separator variants. Previously this function consulted only the legacy
+    pattern list, so the two disagreed on the same string (e.g. "safety:"
+    was permanent here but `unknown/retry` in errors.py).
+    """
+    error = error or ""
+    if not error:
+        return True          # no diagnosis recorded — give it one more chance
+    try:
+        from core.errors import ErrorClass, classify
+        cls = classify(error, status="fail").cls
+        return cls in (ErrorClass.TRANSIENT, ErrorClass.RECOVERABLE,
+                       ErrorClass.PLATFORM, ErrorClass.UNKNOWN)
+    except Exception:
+        pass
+    # Fallback: legacy pattern list (core.errors unavailable).
+    if is_transient_error(error):
+        return True
+    return error.startswith(RETRYABLE_PREFIXES)
 
 
 def _find_file_input(page, prefer_video=True):

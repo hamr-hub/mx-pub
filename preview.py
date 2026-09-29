@@ -15,7 +15,6 @@ Usage:
 from __future__ import annotations
 
 import argparse
-import json
 import sys
 from pathlib import Path
 
@@ -47,7 +46,7 @@ def main():
 
     # Environment
     env = get_env_summary()
-    print(f"\n🌍 Environment:")
+    print("\n🌍 Environment:")
     print(f"  platform: {env['platform']}")
     print(f"  headless: {env['is_headless']}")
     print(f"  chrome_cdp: {env['cdp_url'] or 'not running (would auto-launch)'}")
@@ -58,7 +57,7 @@ def main():
     if active_provider:
         print(f"  → will use: {active_provider}")
     else:
-        print(f"  → no AI key configured, will use heuristic fallback (prompts.csv)")
+        print("  → no AI key configured, will use heuristic fallback (prompts.csv)")
 
     # Find videos
     path = Path(args.path)

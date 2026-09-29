@@ -24,10 +24,15 @@ Titles are capped at 12 chars by the platform; per-day name "AI合集MMDD" fits.
 
 State persisted to collections_state.json so collections are created once.
 """
-import json
+import sys
+import threading
 import time
 from pathlib import Path
 from typing import Optional
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from core.jsonio import atomic_write_json, read_json_safe  # noqa: E402
 
 HERE = Path(__file__).resolve().parent
 STATE_FILE = HERE.parent / "collections_state.json"
@@ -47,13 +52,21 @@ KS_UNRECORDED_LIMIT = 50
 
 
 def _load_state() -> dict:
-    if STATE_FILE.exists():
-        return json.loads(STATE_FILE.read_text())
-    return {"douyin": {}, "kuaishou": {}}
+    state = read_json_safe(STATE_FILE, default={})
+    if not isinstance(state, dict):
+        return {"douyin": {}, "kuaishou": {}}
+    state.setdefault("douyin", {})
+    state.setdefault("kuaishou", {})
+    return state
+
+
+# Written from platform threads during the 合集 reconcile phase.
+_state_lock = threading.Lock()
 
 
 def _save_state(state: dict):
-    STATE_FILE.write_text(json.dumps(state, indent=2, ensure_ascii=False))
+    with _state_lock:
+        atomic_write_json(STATE_FILE, state)
 
 
 def get_or_create_douyin_collection(page, *, name: str, cover_path: str, intro: str = "") -> Optional[str]:
@@ -408,14 +421,20 @@ def get_or_create_kuaishou_collection(page, *, name: str) -> Optional[str]:
             "showStatusType": 1,
         })
         # Server sometimes returns collectionId: 0; resolve by re-listing.
+        # The list read also lags creation by a few seconds (2026-09-15:
+        # immediate re-list missed collections that DID exist), so poll.
         created_id = (data or {}).get("collectionId")
-        existing = next((c for c in ks_list_collections(page)
-                         if c.get("title") == short_name), None)
+        existing = None
+        for _ in range(5):
+            time.sleep(1.5)
+            existing = next((c for c in ks_list_collections(page)
+                             if c.get("title") == short_name), None)
+            if existing is not None:
+                break
         if existing is None:
             print(f"[ks-coll] create '{short_name}' not confirmed "
                   f"(resp collectionId={created_id})")
             return None
-        time.sleep(1)
     state["kuaishou"][name] = {
         "created_at": time.time(), "ref": name,
         "collection_id": existing["collectionId"], "short": short_name,
@@ -488,8 +507,15 @@ def add_videos_to_kuaishou_collection(page, *, collection_name: str,
             "showType": info.get("showType", 1),
             "photoIdList": photo_ids,
         })
-        after = ks_collection_info(page, collection_id)
-        got = len(after.get("photoIdList") or [])
+        # Membership reads lag the write by a second or two (verified 2026-09:
+        # immediate re-fetch returned the old list while the member was in fact
+        # attached), so poll instead of trusting the first read.
+        got = -1
+        for _ in range(4):
+            time.sleep(1.5)
+            got = len(ks_collection_info(page, collection_id).get("photoIdList") or [])
+            if got == len(photo_ids):
+                break
         if got != len(photo_ids):
             print(f"[ks-coll-add] verify FAIL want={len(photo_ids)} got={got}")
             return False

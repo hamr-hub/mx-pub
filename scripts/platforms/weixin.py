@@ -130,8 +130,12 @@ GENERIC_TITLE_SUFFIX = "精彩瞬间"
 def _build_short_title(title: str, description: str = "") -> str:
     """Channels requires 6-14 chars in 短标题. Short queue titles (4-5 chars,
     e.g. 冬日古堡) leave 发表 class-disabled with '标题至少6个字' — the 2026-09
-    partial root cause. Extend with distinct description tokens, then suffix."""
-    t = (title or "").strip()
+    partial root cause. Extend with distinct description tokens, then suffix.
+
+    Punctuation is stripped first: a middle dot in '圣像修复师·凝眸' left 发表
+    class-disabled with NO validation toast (2026-09-15 canary batch), while
+    identical-form titles without it posted fine."""
+    t = re.sub(r"[^一-龥A-Za-z0-9]+", "", (title or "").strip())
     if len(t) >= TITLE_MIN:
         return t[:TITLE_MAX]
     rest = re.sub(re.escape(t), " ", description or "")
@@ -176,6 +180,31 @@ def _fill_form(page, *, title, description, topics) -> None:
         time.sleep(0.3)
     if topics:
         _add_topics(page, topics)
+
+
+def _set_video_annotation(page) -> bool:
+    """视频标注 = 含AI生成内容 (compliance for AI-generated clips).
+
+    The select and its popup both render inside the wujie open shadow root.
+    2026-09 analysis: options list 无需标注/含AI生成内容/虚构剧情仅供娱乐/
+    个人观点仅供参考/营销广告/自行拍摄/转载."""
+    try:
+        # JS el.click() leaves the popup 0x0 (it renders but never displays);
+        # only Playwright's trusted click on .mark-tag-select opens it.
+        page.locator("wujie-app .mark-tag-select").first.click(timeout=8000)
+        time.sleep(0.8)
+        page.locator("wujie-app .mark-tag-option",
+                     has_text="含AI生成内容").first.click(timeout=5000)
+        time.sleep(0.4)
+        display = _sr(page,
+                      "r.querySelector('.mark-tag-select .select-display')"
+                      ".innerText.trim()")
+        ok = display == "含AI生成内容"
+        print(f"[weixin] video annotation: {display}")
+        return ok
+    except Exception as e:
+        print(f"[weixin] video annotation skipped: {e}")
+        return False
 
 
 def _publish_button_state(page):
@@ -306,6 +335,8 @@ def publish_on_page(page, *, title, description, video, topics=None, location=No
         _fill_form(page, title=title, description=description, topics=topics)
     except Exception as e:
         return PublishResult("weixin", "fail", method="cdp", error=f"fill_form: {e}")
+
+    _set_video_annotation(page)
 
     # Button is class-disabled while clip processing runs OR title validation
     # fails; never click a disabled button (the 2026-09 partial root cause).

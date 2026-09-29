@@ -20,7 +20,6 @@ sys.path.insert(0, str(HERE.parent / "scripts"))
 from ai.content import (
     generate_content,
     _call_mock,
-    _heuristic_content,
     _read_prompt_for_video,
     _parse_json_response,
     TITLE_LIMITS,

@@ -91,7 +91,6 @@ def dump_inventory(page, platform):
     data = page.evaluate(js)
     if platform == "weixin":
         try:
-            fr = page.frame_locator("iframe[name=content]")
             frame = next(f for f in page.frames if f.name == "content")
             data["iframe_content"] = frame.evaluate(js)
         except Exception as e:

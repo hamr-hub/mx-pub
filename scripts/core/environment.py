@@ -15,12 +15,14 @@ Functions:
 from __future__ import annotations
 
 import os
+import signal
 import subprocess
 import sys
 import time
 import urllib.request
 from pathlib import Path
 from typing import Optional
+from urllib.parse import urlsplit
 
 
 COMMON_CDP_PORTS = [9222, 9223, 9224, 9225]
@@ -46,7 +48,7 @@ def is_headless_environment() -> bool:
         return True
     if os.environ.get("HEADLESS") in ("1", "true", "yes"):
         return True
-    if not sys.platform.startswith("win") and not sys.platform == "darwin":
+    if not sys.platform.startswith("win") and sys.platform != "darwin":
         # Linux: check if DISPLAY is set
         return not os.environ.get("DISPLAY")
     return False
@@ -116,6 +118,10 @@ def launch_chrome(chrome_path: Optional[str] = None,
         f"--user-data-dir={user_data_dir}",
         "--no-first-run",
         "--no-default-browser-check",
+        # Chrome 111+ rejects ws handshakes with non-allowlisted origins;
+        # Playwright sends none, but raw CDP probes may carry one. The port
+        # is localhost-only, so a wildcard origin is acceptable here.
+        "--remote-allow-origins=*",
         "--disable-background-timer-throttling",
         "--disable-backgrounding-occluded-windows",
         "--disable-renderer-backgrounding",
@@ -124,12 +130,17 @@ def launch_chrome(chrome_path: Optional[str] = None,
         cmd.append("--headless=new")
 
     print(f"  [env] launching Chrome: {chrome_path} (port={port})")
+    # Persist Chrome's own stderr: when the automation Chrome is killed by an
+    # external signal mid-batch, this is the only place a shutdown trace lands.
+    chrome_log = Path("/tmp/mx-pub-chrome.log")
     try:
-        # Detach so Chrome survives our process
+        # Detach so Chrome survives our process. The handle is intentionally
+        # left open: the detached child owns it, and we never write to it.
+        log_fh = open(chrome_log, "ab")  # noqa: SIM115
         subprocess.Popen(
             cmd,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
+            stdout=log_fh,
+            stderr=subprocess.STDOUT,
             stdin=subprocess.DEVNULL,
             start_new_session=True,
         )
@@ -150,6 +161,48 @@ def launch_chrome(chrome_path: Optional[str] = None,
 
     print(f"  [env] Chrome did not become ready within {timeout}s")
     return None
+
+
+def cdp_alive(cdp_url: str) -> bool:
+    """True when the CDP HTTP endpoint answers /json/version."""
+    try:
+        resp = urllib.request.urlopen(f"{cdp_url}/json/version", timeout=3)
+        return "Browser" in resp.read().decode()
+    except Exception:
+        return False
+
+
+def hard_restart_chrome(cdp_url: str = "http://127.0.0.1:9222",
+                        **launch_kwargs) -> Optional[str]:
+    """Terminate whatever listens on the CDP port and start a fresh Chrome.
+
+    Only safe for a single-platform run: a concurrent platform thread shares
+    this browser. Callers gate this behind MX_HARD_RESTART=1; plain
+    ensure_chrome() handles the common case (Chrome process gone entirely).
+    """
+    port = urlsplit(cdp_url).port or 9222
+    try:
+        out = subprocess.run(
+            ["lsof", "-nP", f"-iTCP:{port}", "-sTCP:LISTEN", "-t"],
+            capture_output=True, text=True, timeout=5)
+        pids = [int(x) for x in out.stdout.split()]
+        for pid in pids:
+            try:
+                os.kill(pid, signal.SIGTERM)
+            except ProcessLookupError:
+                pass
+        for _ in range(20):
+            if not cdp_alive(cdp_url):
+                break
+            time.sleep(0.5)
+        for pid in pids:
+            try:
+                os.kill(pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+    except Exception as e:
+        print(f"  [env] hard_restart kill phase failed: {e}")
+    return launch_chrome(port=port, **launch_kwargs)
 
 
 def ensure_chrome(cdp_url: Optional[str] = None, **launch_kwargs) -> str:

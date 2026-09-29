@@ -52,8 +52,69 @@ docker-compose up
 | `ONLY_PLATFORMS` | Whitelist, comma-separated | all except xhs |
 | `SKIP_PLATFORMS` | Extra platforms to skip | none |
 | `LIMIT_PER_PLATFORM` | Cap pending videos per platform | no cap |
-| `RETRY_FAILED=1` | Also retry transient fail rows | off |
+| `RETRY_FAILED=1` | Also re-try **permanent** failures (see below) | off |
 | `MX_DEBUG=1` | Log every captured POST | off |
+| `MX_QUEUE_FILE` | Alternate queue file | `publish_queue.json` |
+| `MX_HUMAN=0` | Disable anti-ban jitter (CI) | on |
+| `MX_PACING=1` | Enforce the adaptive pacing gate | off |
+| `MX_PACING_MAX_WAIT_S` | How long the pacing gate waits before skipping | `300` |
+| `MX_PACING_STATE` | Alternate pacing state file | `pacing_state.json` |
+| `MX_MAX_RECOVERY` | CDP re-attach budget per run | `6` |
+| `MX_HARD_RESTART=1` | Kill+relaunch Chrome on a wedged CDP (single-platform runs only) | off |
+| `MX_PLUGINS_DIR` | Directory scanned for hook plugins | `plugins/` |
+| `MX_SAFETY_ABORT_BATCH=1` | A safety-gate veto halts the platform's whole batch | off (skip only the video) |
+| `MX_SAFETY=1` | Enable the content safety gate | off |
+| `MX_INSIGHTS_MD` | Insights markdown output path | `insights_report.md` |
+| `MX_INSIGHTS_MODEL` | LLM used for the insights narrative | none (heuristic) |
+| `MX_MIN_INTERVAL_S` / `MX_BURST_LIMIT` / `MX_BURST_REST_S` / `MX_FAIL_BACKOFF` | Learned pacing parameters | `120` / `5` / `300` / `0.6` |
+
+## Retry semantics
+
+A row is re-attempted only if its last attempt left it in a state that a retry
+can plausibly fix:
+
+| Last state | Re-attempted? |
+|---|---|
+| `ok` | never — terminal |
+| `blocked` (short clip / safety veto) | never — terminal |
+| `fail`, transient (timeout, dead CDP, target closed) | yes, by default |
+| `fail`, permanent (content rejection, account limit, ban) | only with `RETRY_FAILED=1` |
+
+`RETRY_FAILED=1` force-re-arms permanent failures. Use it deliberately: a
+content rejection will not become publishable by trying harder, and repeatedly
+re-submitting banned content is how an account gets flagged.
+
+`is_retryable_failure()` in [`scripts/publisher.py`](scripts/publisher.py) is
+the single source of truth for that decision — both the queue filter and the
+in-run retry use it, and it delegates to the table-driven
+`classify()` in [`scripts/core/errors.py`](scripts/core/errors.py), so the two
+cannot drift apart.
+
+Classification normalises case and separators (`fatal_connection_closed`,
+`FATAL-CONNECTION-CLOSED` and `Connection closed` are one signal), and knows
+the driver's own machine-readable markers (`safety:`, `duration_…below_min_5s`)
+plus real platform rejection wording (视频违规 / 审核不通过 / 存在争议).
+
+Safety-gate vetoes skip only the flagged video by default. Set
+`MX_SAFETY_ABORT_BATCH=1` to halt the whole platform for the day instead.
+
+Queue counters are computed over every platform the queue has records for, not
+just the ones in the current run — a single-platform run can no longer report
+`remaining: 0` over real pending work. `by_platform` in the queue file and the
+run summary show the per-platform breakdown.
+
+## Development
+
+```bash
+python3 -m pytest            # 125 tests
+python3 -m ruff check .      # lint gate (config in pyproject.toml)
+```
+
+`pyproject.toml` holds the ruff and pytest configuration. The lint gate is
+deliberately narrow (`E,F,W,B,SIM`): pyupgrade/isort rewrites are off because
+they churn ~100 lines of a battle-tested publisher for no functional gain, and
+import sorting would reorder the `sys.path`-insert-then-import blocks these
+files depend on.
 
 ## Architecture
 
@@ -84,7 +145,57 @@ Legacy one-offs live in `archive/2026-09/` (including the old
 ## Tests
 
 ```bash
-python3 tests/test_ai_providers.py
+python3 -m pytest            # everything
+python3 -m pytest tests/test_batch_policy.py   # batch policy regressions
 ```
 
-10 tests covering: constants, JSON parsing, mock provider, heuristic fallback, prompts.csv lookup, platform-specific content.
+| File | Covers |
+|---|---|
+| `tests/test_batch_policy.py` | retry eligibility, mxpub→driver hand-off, pacing gate, queue totals, ApiWatch lifecycle |
+| `tests/test_safety_gate_flow.py` | end-to-end control flow of the safety gate in `run_platform` (fake Chrome, real loop) |
+| `tests/test_error_taxonomy.py` | classifier/retry-filter agreement across separator styles and driver markers |
+| `tests/test_state_io.py` | atomic + concurrent state file writes, corrupt-file recovery |
+| `tests/test_self_healing.py` | error taxonomy, recovery, health, hooks, safety gate |
+| `tests/test_integration.py` | end-to-end pipeline: event log → risk → insights |
+| `tests/test_curation.py` | content selection primitives |
+| `tests/test_ai_providers.py` | provider fallback + platform-specific content |
+## Self-healing & self-learning layer (2026-09)
+
+On top of the stable CDP driver, mx-pub now ships a self-healing +
+self-learning + extensibility layer that makes the publisher AI-driven and
+robust to almost anything:
+
+| Module | Purpose |
+|---|---|
+| `scripts/core/errors.py` | Classifies every failure into TRANSIENT/RECOVERABLE/CONTENT/ACCOUNT/PLATFORM/FATAL and recommends an action |
+| `scripts/core/recovery.py` | Auto-runs the recommended action (refresh page, re-login, cool down) |
+| `scripts/core/health.py` | Pre-flight health gate (cookie alive, captcha, warning banner) |
+| `scripts/core/behavior.py` | Human-like jitter (form pauses, micro mouse moves, previews look) |
+| `scripts/core/hooks.py` | Plugin hook system: `batch:before`, `video:after_publish`, `video:on_error`, etc. |
+| `scripts/core/pacing.py` | Adaptive pacing per platform (min interval, burst limit, cool-down) |
+| `scripts/self_learn/stats.py` | JSONL event log of every publish attempt |
+| `scripts/self_learn/optimizer.py` | Recommends best hours, pacing params based on history |
+| `scripts/self_learn/risk.py` | Detects ban-risk signatures (consecutive fails, bursts, repeated classes) |
+| `scripts/extension/registry.py` | Plug-in registry for new platforms / content providers |
+| `scripts/intelligence/report.py` | AI-driven insights report (Markdown + JSON, optional LLM) |
+| `mxpub.py` | New unified entrypoint: `publish` / `insights` / `health` / `stats` / `extensions` |
+
+Adding a new platform (e.g. bilibili, youtube shorts) is now a 2-step operation:
+1. Drop a publisher module under `scripts/platforms/<name>.py` with the same
+   `publish_on_page(page, ...)` signature as the existing ones.
+2. Drop a one-file plugin under `scripts/extension/<name>.py` that calls
+   `register_platform(PlatformSpec(...))`.
+
+No edits to `batch_publish.py` or any other core file are required.
+
+Full guide: [`docs/NEXT_GEN.md`](docs/NEXT_GEN.md).
+
+```bash
+python3 mxpub.py publish            # full batch (auto-runs risk gate)
+python3 mxpub.py publish --platform douyin
+python3 mxpub.py publish --force    # ignore risk warnings
+python3 mxpub.py health
+python3 mxpub.py stats
+python3 mxpub.py insights           # write insights_report.md + .json
+python3 mxpub.py extensions         # list registered platforms
+```

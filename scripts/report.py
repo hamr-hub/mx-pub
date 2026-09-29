@@ -103,7 +103,7 @@ def render_markdown(date_str: str, snapshot: dict[str, dict], state: dict[str, d
         # Union of metric keys across platforms with data
         metric_keys: list[str] = []
         for payload in snapshot.values():
-            for k in (payload.get("metrics") or {}).keys():
+            for k in (payload.get("metrics") or {}):
                 if k not in metric_keys:
                     metric_keys.append(k)
 
@@ -136,7 +136,7 @@ def render_markdown(date_str: str, snapshot: dict[str, dict], state: dict[str, d
         lines.append("\n| 字段 | 值 | 原始 |")
         lines.append("|------|----:|------|")
         raw = payload.get("matched_raw") or {}
-        for k in m.keys():
+        for k in m:
             lines.append(f"| `{k}` | {fmt_num(m[k])} | {raw.get(k, '')} |")
 
     return "\n".join(lines) + "\n"

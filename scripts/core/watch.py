@@ -38,16 +38,59 @@ def is_fatal_connection_error(exc: BaseException) -> bool:
     return any(m in msg for m in FATAL_CONNECTION_MARKERS)
 
 
+# One live watcher per page. The batch driver reuses a single tab per platform
+# and creates a fresh ApiWatch for every video, but nothing ever called
+# remove_listener: listeners accumulated for the life of the tab (96 videos ==
+# 96 listeners), so every response was dispatched to all of them and each kept
+# growing its own event list. That is a slow memory/CPU leak across a batch.
+# Videos are published strictly sequentially per tab, so the previous watcher
+# is provably finished when the next one is built — closing it is safe, and its
+# captured history stays readable for anyone still holding a reference.
+_ACTIVE: dict[int, "ApiWatch"] = {}
+
+
 class ApiWatch:
-    """Capture JSON XHR/fetch responses on a page (includes iframe responses)."""
+    """Capture JSON XHR/fetch responses on a page (includes iframe responses).
+
+    Lifecycle: construct one per video, and it detaches the page listener of
+    any watcher this page already had. Prefer an explicit `close()` (or use it
+    as a context manager) when you want deterministic teardown.
+    """
 
     def __init__(self, page, method: str = "POST"):
         self.page = page
         self.method = method.upper()
         self.events: list = []
+        self.closed = False
+        key = id(page)
+        previous = _ACTIVE.get(key)
+        if previous is not None and previous is not self:
+            previous.close()
+        _ACTIVE[key] = self
+        self._key = key
         page.on("response", self._on_response)
 
+    def close(self) -> None:
+        """Detach from the page. Captured events remain readable."""
+        if self.closed:
+            return
+        self.closed = True
+        try:
+            self.page.remove_listener("response", self._on_response)
+        except Exception:
+            pass
+        if _ACTIVE.get(self._key) is self:
+            _ACTIVE.pop(self._key, None)
+
+    def __enter__(self) -> "ApiWatch":
+        return self
+
+    def __exit__(self, *exc) -> None:
+        self.close()
+
     def _on_response(self, resp) -> None:
+        if self.closed:
+            return
         try:
             req = resp.request
             if req.method.upper() != self.method:
