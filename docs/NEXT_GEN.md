@@ -81,6 +81,30 @@ mxpub.py                  # 新一代统一入口
 - 该用什么节奏（间隔、爆发限制）
 - 警告（成功率低、爆发失败等）
 
+### 闭环：建议会被真正采纳
+
+优化器给出的 `pacing` 字典本来就是 `PacingController.update_params()` 的参数
+形状，但此前**没有任何代码调用它** —— 系统统计了自己的历史，把建议写进洞察
+报告，然后用回默认参数发布。现在 `batch_publish` 在启动时（平台并发之前）调用
+`_apply_learned_pacing()`，并打印实际采纳的参数。
+
+无论 `MX_PACING` 是否开启都会执行，因为节奏状态本来就一直在记录；这样运维
+真正打开 `MX_PACING=1` 的那一刻，参数已经是调好的。整个过程包在 try 里：建议
+永远不能挡住发布。
+
+采纳前一律经 `clamp_pacing()` 收敛到 `PACING_BOUNDS`（`min_interval_s`
+30–600s、`burst_rest_s` 60–1800s、`fail_rate_backoff` 0.10–0.95）。学习到的
+间隔是**每条视频的实打实等待成本**，一个失控的值会让队列永远排不空。
+
+间隔来自**相邻两次成功发布之间的实测间隔中位数**（账号已经证明能承受的节奏），
+而不是"单条发布耗时"：
+
+> 旧公式是 `avg_dur * 1.5`，把"发一条要多久"当成了"发完要等多久"。按真实历史
+> 算，抖音单条平均 451s，于是额外再等 1015s —— 96 条队列在本身约 12 小时的
+> 上传之外，还要多排约 27 小时，队列永远排不空。现在抖音学到 270s。
+
+样本不足 5 个间隔时保持默认 120s，不猜。
+
 ## 风险监视
 
 `self_learn/risk.py` 检测封号前兆：
@@ -241,6 +265,27 @@ MX_SAFETY=1 python3 mxpub.py publish
 - `video:after_publish` → 视频间 4–12s 停顿（模拟人切换上下文）
 
 `MX_HUMAN=0` 可关闭（CI/调试用），`MX_HUMAN_INTENSITY=subtle|normal|thorough` 控制强度。
+
+### 媒体预检（core/media.py + batch_publish）
+
+`is_publishable_duration()` 对读不出来的媒体**故意 fail-open**（免得 ffprobe
+缺失就挡住真实发布）。同样的 fail-open 也让"源文件根本不存在"的行一路走到
+Playwright 才炸回来。
+
+- `missing_media_reason()`：空路径 / 不是文件 / 0 字节
+- 预检拦下，**不再消耗一次浏览器往返**
+- 分类为 `transient/media_unreadable`（60s 冷却），**不是终态** —— 移动硬盘
+  没挂载是会回来的，判成终态会永久跳过该卷上的所有队列
+- 关键分支：浏览器报 ENOENT 但驱动进程能打开该文件 ⇒ 是长期存活的 Playwright
+  Node 驱动持有过期的挂载表。此时页面级恢复（刷新/重登）无效，直接走已有的
+  **会话重建**路径，换一个驱动进程后剩余队列正常发布
+
+### 崩溃的渲染进程 = 死掉的 target
+
+`Page.bring_to_front: Target crashed` 曾被判为 `unknown/retry`（真实运行因此
+在 15 条连续崩溃后结束）。`core/errors.py` 和 `core/watch.py` 现在都把
+crash 识别为 `fatal_connection` → `ABORT_PLATFORM` → 会话恢复（Chrome 真没
+了会重新拉起），而不是在一个永远不可能恢复的页面上逐条重试。
 
 ### 智能临时错误判断（core/browser.py）
 

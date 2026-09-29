@@ -22,7 +22,7 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 from self_learn.stats import StatsStore
-from self_learn.optimizer import StrategyOptimizer
+from self_learn.optimizer import StrategyOptimizer, clamp_pacing
 from self_learn.risk import RiskMonitor
 
 
@@ -102,7 +102,12 @@ class InsightsGenerator:
                 "best_hour": (f"{rec.best_hour:02d}:00"
                                if rec.best_hour is not None else "未知"),
                 "avoid_hours": [f"{h:02d}:00" for h in rec.avoid_hours],
-                "pacing_recommendation": rec.pacing,
+                # Show what the batch will actually adopt, not the raw
+                # advice: _apply_learned_pacing() pushes the clamped values
+                # into the pacer, so reporting unclamped numbers here would
+                # have the operator reading a 16s interval while the system
+                # runs at the 30s floor.
+                "pacing_recommendation": clamp_pacing(rec.pacing),
                 "warnings": rec.warnings,
                 "insights": rec.insights,
             }
