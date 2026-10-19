@@ -52,3 +52,7 @@ insights_report.json
 # Tool caches
 .pytest_cache/
 .ruff_cache/
+
+# OAuth credentials / tokens (never commit)
+secrets/
+client_secret*.json

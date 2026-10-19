@@ -41,6 +41,10 @@ from core.jsonio import atomic_write_json, read_json_safe
 
 QUEUE_FILE = Path(os.environ.get("MX_QUEUE_FILE", HERE / "publish_queue.json"))
 DEFAULT_PLATFORMS = ["douyin", "kuaishou", "weixin", "xhs"]
+# Pure-HTTP platforms (OAuth2 + REST, no Chrome/CDP). Reached opt-in via
+# ONLY_PLATFORMS — YouTube uploads cost ~1,600 quota units each (~6/day on the
+# default 10k budget), so they never ride along in a default batch.
+API_ONLY_PLATFORMS = {"youtube"}
 DONE_STATUSES = ("ok", "blocked")
 
 _state_lock = threading.Lock()
@@ -232,6 +236,95 @@ def reconcile_douyin_collections(page, queue: dict, *, coll_name: str,
                   f"{str(e)[:150]}")
 
 
+def _run_api_only_platform(platform: str, mod, videos: list, queue: dict,
+                           topics_map: dict, *, _stats=None,
+                           _pacing=None) -> dict:
+    """Iterate pending rows on a pure-HTTP platform (currently YouTube).
+
+    Mirrors the browser loop's queue writeback, preflight and telemetry, but
+    skips Chrome entirely — and skips the 5s duration floor (that is a CN
+    creator-studio account rule, not a YouTube constraint).
+    """
+    summary = {"ok": 0, "fail": 0, "partial": 0, "blocked": 0, "errors": []}
+    privacy = os.environ.get("MX_YT_PRIVACY", "private")
+    category_id = os.environ.get("MX_YT_CATEGORY", "").strip() or None
+    total = len(videos)
+    print(f"[{platform}] {total} videos pending (api-only, privacy={privacy})",
+          flush=True)
+
+    for idx, video in enumerate(videos, 1):
+        title = video.get("title", "")
+        short = f"{title} ({video['name'][:20]})"
+        t0 = time.time()
+        video_path = ((video.get("platform_paths") or {}).get(platform)
+                      or video["path"])
+        media_problem = missing_media_reason(video_path)
+        result = None
+        publish_it = True
+
+        if media_problem:
+            # Transient like the browser path: an unmounted volume re-arms later.
+            result = PublishResult(platform, "fail", method="preflight",
+                                   error=f"file_missing:{media_problem}")
+            publish_it = False
+        elif _HAS_NEXT_GEN:
+            try:
+                Hooks.emit("video:before_publish", video=video,
+                           platform=platform)
+                verdict = video.pop("_safety_verdict", None)
+                if verdict and not verdict.get("allow", True):
+                    result = PublishResult(platform, "blocked",
+                                           method="safety_gate",
+                                           error="safety:"
+                                                 f"{verdict.get('reason','')[:120]}")
+                    publish_it = False
+            except Exception:
+                pass
+
+        if publish_it:
+            kwargs = {"title": title,
+                      "description": video.get("description", ""),
+                      "video": video_path,
+                      "topics": topics_map[id(video)],
+                      "privacy": privacy,
+                      **({"category_id": category_id} if category_id else {})}
+            try:
+                result = mod.publish_via_api(**kwargs)
+            except Exception as e:
+                result = PublishResult(platform, "fail", method="api",
+                                       error=f"exception: {str(e)[:180]}")
+
+        result.duration_s = time.time() - t0
+        with _state_lock:
+            video.setdefault("published", {})[platform] = result_dict(result)
+            save_queue(queue)
+            track(platform, result)
+
+        if _pacing is not None:
+            try:
+                _pacing.record(platform, success=result.status == "ok")
+            except Exception:
+                pass
+
+        if _HAS_NEXT_GEN:
+            try:
+                _record_event(_stats, video, result, 1)
+                Hooks.emit("video:after_publish", video=video,
+                           platform=platform, result=result)
+            except Exception:
+                pass
+
+        key = result.status if result.status in summary else "fail"
+        summary[key] += 1
+        mark = {"ok": "✅", "partial": "⚠️ ", "fail": "❌",
+                "blocked": "🚫"}.get(result.status, "?")
+        detail = (result.error or result.details.get("url", ""))[:70]
+        print(f"[{platform}] {idx}/{total} {mark} {result.status} "
+              f"{result.duration_s:.0f}s {short} {detail}", flush=True)
+
+    return summary
+
+
 def run_platform(platform: str, queue: dict, cdp_url: str,
                   *, _stats=None, _pacing=None,
                   _risk_force: bool = False,
@@ -265,6 +358,20 @@ def run_platform(platform: str, queue: dict, cdp_url: str,
     print(f"[{platform}] {len(videos)} videos pending")
     mod = _get_module(platform)
     topics_map = {id(v): derive_topics(v) for v in videos}
+
+    if platform in API_ONLY_PLATFORMS:
+        # Pure HTTP (OAuth2) path — no Chrome, CDP, or Playwright.
+        if _HAS_NEXT_GEN:
+            if _maybe_risk_block(platform, _stats, force=_risk_force):
+                print(f"[{platform}] ⛔ 风控 critical, 跳过本次批次", flush=True)
+                return {"ok": 0, "partial": 0, "fail": 0,
+                        "errors": ["risk_blocked"]}
+            if _pacing is not None and not _pacing_gate(platform, _pacing):
+                return {"ok": 0, "partial": 0, "fail": 0,
+                        "errors": ["pacing_blocked"]}
+        return _run_api_only_platform(platform, mod, videos, queue,
+                                      topics_map, _stats=_stats,
+                                      _pacing=_pacing)
 
     def _stop_pw(driver) -> None:
         if driver is None:
@@ -712,9 +819,13 @@ def main(platforms: list | None = None, *, retry_failed: bool = False,
         print("❌ 没有可发布的平台。")
         return 1
 
-    env = get_env_summary()
-    cdp_url = ensure_chrome(headless=env["is_headless"])
-    print(f"🌍 cdp={cdp_url} headless={env['is_headless']}")
+    if all(p in API_ONLY_PLATFORMS for p in platforms):
+        cdp_url = ""
+        print("🌐 api-only batch; skipping Chrome bootstrap")
+    else:
+        env = get_env_summary()
+        cdp_url = ensure_chrome(headless=env["is_headless"])
+        print(f"🌍 cdp={cdp_url} headless={env['is_headless']}")
 
     queue = load_queue()
     if retry_failed:
