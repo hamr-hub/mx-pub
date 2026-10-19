@@ -25,7 +25,7 @@ from collections import Counter
 from dataclasses import dataclass, field
 from typing import Optional
 
-from core.errors import Action
+from core.errors import Action, ErrorClass
 from self_learn.stats import StatsStore
 
 
@@ -57,17 +57,26 @@ class RiskMonitor:
     def __init__(self, store: StatsStore, *,
                  warn_rate: float = 0.7,
                  critical_rate: float = 0.4,
-                 lookback: int = 30):
+                 lookback: int = 30,
+                 max_age_s: float = 24 * 3600):
         self.store = store
         self.warn_rate = warn_rate
         self.critical_rate = critical_rate
         self.lookback = lookback
+        # History is also bounded by age. The window used to be "the last N
+        # events" regardless of when they happened, so a run that failed last
+        # Tuesday still vetoed today's batch — the monitor would block the
+        # platform forever with no path back to publishing.
+        self.max_age_s = max_age_s
 
     def check(self, platform: str, *,
               now: Optional[float] = None) -> RiskReport:
         now = now or time.time()
         events = self.store.for_platform(platform)
         recent = events[-self.lookback:]
+        if self.max_age_s > 0:
+            cutoff = now - self.max_age_s
+            recent = [e for e in recent if e.ts >= cutoff]
         n = len(recent)
         report = RiskReport(platform=platform, sample_size=n)
         if n == 0:
@@ -114,14 +123,20 @@ class RiskMonitor:
                 report.recommend_action = Action.COOL_DOWN
                 report.cooldown_s = max(report.cooldown_s, 300.0)
 
-        # 3. Repeated identical error class (looks like an automation burst)
-        classes = Counter(e.cls for e in recent if e.cls)
-        if classes:
+        # 3. Repeated identical error class (looks like an automation burst).
+        #    Only failures count: successes used to carry a class too, so this
+        #    reported "30/30 recent failures" on a 100%-success platform. The
+        #    denominator is the failure count for the same reason.
+        failures = [e for e in recent if e.status not in ("ok", "blocked")]
+        classes = Counter(e.cls for e in failures
+                          if e.cls and e.cls != ErrorClass.OK.value)
+        n_fail = len(failures)
+        if classes and n_fail:
             top_cls, top_n = classes.most_common(1)[0]
-            if top_n >= 3 and top_n / n >= 0.5:
+            if top_n >= 3 and top_n / n_fail >= 0.5:
                 report.triggers.append(
-                    f"{top_n}/{n} recent failures classed as '{top_cls}' "
-                    "(automation-burst signature)")
+                    f"{top_n}/{n_fail} recent failures classed as "
+                    f"'{top_cls}' (automation-burst signature)")
                 if report.level == "ok":
                     report.level = "warn"
                 report.cooldown_s = max(report.cooldown_s, 600.0)

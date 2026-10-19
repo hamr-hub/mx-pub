@@ -238,7 +238,7 @@ class StatsStore:
         for ev in self.all():
             if platform is not None and ev.platform != platform:
                 continue
-            if ev.cls:
+            if ev.cls and ev.status not in ("ok", "blocked"):
                 c[(ev.cls, ev.action)] += 1
         return c
 

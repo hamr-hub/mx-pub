@@ -458,6 +458,34 @@ def ks_photo_infos(page, photo_ids: list) -> list:
     return rows
 
 
+def union_photo_ids(existing, candidates) -> tuple[list, int]:
+    """Append candidate ids not already present, comparing across JSON types.
+
+    `photoIdList` comes from collection/info and candidates from
+    unrecorded/list/v2 — two different endpoints. If one serialises the
+    12-digit id as a number and the other as a string, a plain `in` check
+    fails to see an existing member: the id is appended anyway, so update
+    sends a duplicate (visible twice in the collection), and if the platform
+    dedupes server-side our own length verification then reports a false
+    "verify FAIL" on an attach that actually succeeded.
+
+    Original values are preserved in the payload; only the comparison is
+    normalised.
+
+    Returns (merged_list, n_added).
+    """
+    merged = list(existing)
+    seen = {str(p) for p in merged}
+    added = 0
+    for pid in candidates:
+        if str(pid) in seen:
+            continue
+        seen.add(str(pid))
+        merged.append(pid)
+        added += 1
+    return merged, added
+
+
 def add_videos_to_kuaishou_collection(page, *, collection_name: str,
                                       video_titles: list) -> bool:
     """Attach works (matched by title prefix) to a collection via update API.
@@ -481,7 +509,7 @@ def add_videos_to_kuaishou_collection(page, *, collection_name: str,
 
     works = ks_unrecorded_works(page)
     wanted = [_norm_title(t) for t in video_titles]
-    already, added_titles, blocked = 0, [], []
+    already, added_titles, blocked, pending = 0, [], [], []
     for key in wanted:
         if any(mk.startswith(key) for mk in member_keys):
             already += 1
@@ -492,10 +520,12 @@ def add_videos_to_kuaishou_collection(page, *, collection_name: str,
             blocked.append(f"{key}:not_found")
         elif not row.get("available", True):
             blocked.append(f"{key}:{row.get('filterReason') or 'unavailable'}")
-        elif row["photoId"] not in photo_ids:
-            photo_ids.append(row["photoId"])
+        else:
             added_titles.append(key)
+            pending.append({"_photo_id": row["photoId"]})
 
+    # One type-safe union for the whole batch, rather than per-row appends.
+    photo_ids, _ = union_photo_ids(photo_ids, [r["_photo_id"] for r in pending])
     newly_added = len(added_titles)
     if newly_added:
         _ks_post(page, "/collection/update", {

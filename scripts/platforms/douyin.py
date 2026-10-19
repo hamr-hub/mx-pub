@@ -261,6 +261,69 @@ def _publish_api_ok(data) -> bool:
     return bool((data.get("status_code") in (0, None) or data.get("statusCode") in (0, None)) and (data.get("item_id") or data.get("aweme_id") or data.get("itemId") or data.get("awemeId")))
 
 
+# 2026-10-14 /goal：上传就绪判定曾两度失效。旧版等 `transend` XHR —— 实测抓包
+# 上传链根本没有名为 transend 的 JSON POST，等待必然烧满 420s；兜底的
+# `!innerText.includes("上传中")` 又被常驻静态提示「如作品还在上传中」恒假化。
+# 插桩实测的可信时序（0.5s 采样）：set_input_files 后约 0.8s 出现
+# `.upload-progress-*` 卡片（0%→100%，伴随「取消上传 / 上传过程中」文案），
+# 传完卡片先卸载（此时预览 <video> 尚未挂载），约 2s 后 video 出现且
+# readyState 由 0 一次跳到 4、duration/videoWidth 可用。标题框 / 编辑器 /
+# 「选择封面」在空页面就存在，不能当信号。
+# 返回：busy=字节上传中 | idle=尚未开始 | meta=预览已挂载未解码 | done=可发布
+_UPLOAD_STATE_JS = (
+    "(() => {"
+    " const c=document.querySelector('[class*=\"upload-progress-\"]');"
+    " const busy=!!(c && (c.offsetWidth||c.offsetHeight));"
+    " const txt=document.body.innerText;"
+    " if (busy || txt.includes('取消上传') || txt.includes('上传过程中'))"
+    "   return 'busy';"
+    " const vs=[...document.querySelectorAll('video')];"
+    " if (vs.some(v => v.readyState===4 && isFinite(v.duration)"
+    "                 && v.duration>0 && v.videoWidth>0)) return 'done';"
+    " if (vs.some(v => v.readyState>0)) return 'meta';"
+    " return 'idle';"
+    "})()"
+)
+# 连续 3 次 done（间隔 0.6s）才算就绪，跨过卡片卸载/预览挂载的抖动窗口。
+_UPLOAD_DONE_STREAK = 3
+# 没采到上传卡片也允许判定 done 的最早时刻：防极快/缓存上传卡片一闪而过，
+# 同时挡住 t≈0 时旧页面残留预览造成的误判。
+_UPLOAD_NO_CARD_GRACE_S = 15.0
+
+
+def _wait_upload_ready(page, watch, timeout: int) -> bool:
+    """Poll the upload state machine until a stable 'done'.
+
+    `watch` stays in the signature for call-site symmetry; the upload chain
+    emits no capturable completion XHR, so DOM state is the only signal.
+    """
+    deadline = time.time() + timeout
+    t0 = time.time()
+    saw_busy = False
+    streak = 0
+    while time.time() < deadline:
+        try:
+            state = page.evaluate(_UPLOAD_STATE_JS)
+        except Exception as e:
+            if is_fatal_connection_error(e):
+                raise
+            streak = 0
+            time.sleep(0.6)
+            continue
+        if state == "busy":
+            saw_busy = True
+            streak = 0
+        elif state == "done" and (saw_busy
+                                  or time.time() - t0 > _UPLOAD_NO_CARD_GRACE_S):
+            streak += 1
+            if streak >= _UPLOAD_DONE_STREAK:
+                return True
+        else:
+            streak = 0
+        time.sleep(0.6)
+    return False
+
+
 def publish_via_api(*, title, description, video, topics=None, location=None, **kwargs) -> PublishResult:
     return PublishResult("douyin", "fail", method="api",
                          error="douyin_api_requires_xbogus_signature_use_browser")
@@ -282,15 +345,7 @@ def publish_on_page(page, *, title, description, video, topics=None, location=No
             raise
         return PublishResult("douyin", "fail", method="cdp", error=f"upload: {e}")
 
-    # Ready when transcode register (transend) returned and the form rendered.
-    transend = watch.wait_url("transend", timeout=UPLOAD_TIMEOUT_S)
-    form_ready = wait_dom(
-        page,
-        'document.querySelector(\'input[placeholder*="填写作品标题"]\') !== null'
-        ' && !document.body.innerText.includes("上传中")',
-        timeout=20,
-    )
-    if not transend and not form_ready:
+    if not _wait_upload_ready(page, watch, UPLOAD_TIMEOUT_S):
         return PublishResult("douyin", "fail", method="cdp", error="upload_not_ready_timeout")
     print(f"[douyin] upload ready {time.time()-t0:.0f}s", flush=True)
     # Cover/analysis settle briefly (no fixed long sleep)

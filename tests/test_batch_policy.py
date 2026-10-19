@@ -376,3 +376,35 @@ def test_apiwatch_close_is_idempotent():
     w.close()
     w.close()
     assert page.listeners == []
+
+
+# ---------------------------------------------------------------------------
+# Platform name validation
+# ---------------------------------------------------------------------------
+
+def test_known_platforms_lists_the_registry():
+    known = batch_publish.known_platforms()
+    for name in ("douyin", "kuaishou", "weixin"):
+        assert name in known
+
+
+def test_unknown_platform_is_rejected_before_launching_chrome(capsys):
+    """A typo in ONLY_PLATFORMS used to surface as a thread-level ImportError
+    after Chrome had already been launched."""
+    assert batch_publish.validate_platforms(["kuaishu2", "typo"]) == []
+    out = capsys.readouterr().out
+    assert "kuaishu2" in out and "douyin" in out, out
+
+
+def test_validation_keeps_valid_platforms():
+    assert batch_publish.validate_platforms(
+        ["kuaishu2", "douyin", "typo"]) == ["douyin"]
+
+
+def test_main_exits_nonzero_when_no_platform_survives(monkeypatch):
+    launched = []
+    monkeypatch.setattr(batch_publish, "ensure_chrome",
+                        lambda *a, **k: launched.append(1) or "http://x")
+    monkeypatch.setattr(batch_publish, "validate_platforms", lambda p: [])
+    assert batch_publish.main(["nope"]) == 1
+    assert not launched, "Chrome must not be started when nothing can publish"

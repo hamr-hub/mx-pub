@@ -51,10 +51,14 @@ def _read_video_metadata(video_path: str) -> dict:
     """Extract basic metadata from video file (size, mtime)."""
     p = Path(video_path)
     if not p.exists():
-        return {"name": p.name}
+        return {"name": p.name, "path": str(p)}
     stat = p.stat()
     return {
         "name": p.name,
+        # The full path matters: the media tree holds several files with the
+        # same basename but different prompts.csv seeds, and a name-only prompt
+        # made the lookup resolve to whichever one was found first.
+        "path": str(p),
         "size_mb": round(stat.st_size / 1024 / 1024, 1),
     }
 
@@ -124,6 +128,134 @@ def _call_ollama(prompt: str, system: str = "", model: str = "llama3.2") -> str:
         raise RuntimeError(f"ollama: {e}")
 
 
+#: Resolved once — both candidates usually point at the same tree, and the
+#: images directory holds ~60k entries on this machine.
+_VIDEO_SEARCH_ROOTS: list[Path] = [
+    Path("/Users/hyx/ssd/codespace/personal/images"),
+    Path("~/ssd/codespace/personal/images").expanduser(),
+]
+
+#: filename -> resolved path (or None). Without this, generating content for
+#: a batch re-walked the whole tree once per video.
+_video_lookup_cache: dict[str, Optional[str]] = {}
+
+#: Directories that never contain source media and are expensive to walk.
+_SKIP_DIRS = {".git", ".Trash", ".svn", "__pycache__", "node_modules",
+              ".cache", "Library"}
+
+
+#: {filename: path} for every media file under the roots, built lazily on the
+#: first lookup that has to fall back to a tree walk.
+_video_index: Optional[dict[str, str]] = None
+
+_MEDIA_SUFFIXES = (".mp4", ".mov", ".m4v", ".webm", ".avi", ".mpg", ".mpeg")
+
+
+def _build_video_index(*, max_depth: int = 6) -> dict[str, str]:
+    """One walk of the media roots, recording every file by basename.
+
+    Built at most once per process. The previous code re-walked the whole tree
+    for every video (60k entries here), twice over, because both search roots
+    resolve to the same directory — so generating content for a batch cost
+    minutes. Ambiguous basenames keep their first (shallowest) match.
+    """
+    global _video_index
+    if _video_index is not None:
+        return _video_index
+
+    index: dict[str, str] = {}
+    seen_roots: set[Path] = set()
+    for root in _VIDEO_SEARCH_ROOTS:
+        try:
+            resolved = root.resolve()
+        except OSError:
+            continue
+        if resolved in seen_roots or not resolved.is_dir():
+            continue
+        seen_roots.add(resolved)
+        root_depth = len(resolved.parts)
+        for dirpath, dirnames, filenames in os.walk(resolved):
+            here = Path(dirpath)
+            if len(here.parts) - root_depth >= max_depth:
+                dirnames[:] = []          # prune deeper levels
+            dirnames[:] = [d for d in dirnames if d not in _SKIP_DIRS]
+            for name in filenames:
+                if name.lower().endswith(_MEDIA_SUFFIXES):
+                    index.setdefault(name, str(here / name))
+    _video_index = index
+    return index
+
+
+def _resolve_video_path(filename: str) -> Optional[str]:
+    """Resolve the video the prompt refers to.
+
+    The prompt usually carries the full path the caller already had, so try it
+    directly before touching the tree. Falling straight through to a basename
+    search is wrong: the media tree holds several `video_1.mp4` files with
+    different prompts.csv seeds, and first-match-wins silently picked the
+    wrong one.
+    """
+    if not filename:
+        return None
+    candidate = Path(filename.strip())
+    if len(candidate.parts) > 1:
+        try:
+            if candidate.is_file():
+                return str(candidate)
+        except OSError:
+            pass
+    return _find_source_video(filename)
+
+
+def _find_source_video(filename: str) -> Optional[str]:
+    """Locate a source video by name under the known media roots.
+
+    Cached per filename, and backed by a single lazily-built index so a batch
+    costs one tree walk in total rather than one per video.
+    """
+    if not filename:
+        return None
+    if filename in _video_lookup_cache:
+        return _video_lookup_cache[filename]
+
+    target = Path(filename).name
+    index = _build_video_index()
+    found = index.get(target)
+    if found is None:
+        _video_lookup_cache[filename] = None
+        return None
+
+    # Several files can share a basename. If the caller named a path, prefer
+    # the candidate sharing the deepest directory prefix with it.
+    wanted = Path(filename.strip()).parent
+    if len(wanted.parts) > 1:
+        wanted_parts = wanted.parts
+        best, best_score = found, -1
+        for name, path in index.items():
+            if name != target:
+                continue
+            score = 0
+            # Prefix comparison: the two paths have different depths.
+            for a, b in zip(wanted_parts,  # noqa: B905
+                           Path(path).parent.parts):
+                if a != b:
+                    break
+                score += 1
+            if score > best_score:
+                best, best_score = path, score
+        found = best
+
+    _video_lookup_cache[filename] = found
+    return found
+
+
+def _reset_video_lookup_cache() -> None:
+    """Test seam: drop both the memo and the index."""
+    global _video_index
+    _video_lookup_cache.clear()
+    _video_index = None
+
+
 def _call_mock(prompt: str, system: str = "", model: str = "mock") -> str:
     """Mock AI provider for testing. Generates platform-appropriate content
     deterministically from prompts.csv topic_seed. Set MOCK_AI=1 to enable.
@@ -133,28 +265,18 @@ def _call_mock(prompt: str, system: str = "", model: str = "mock") -> str:
     import re as _re
 
     # Extract filename and platform style
-    m = _re.search(r"视频文件名: ([^\n]+)", prompt)
+    # Prefer the full path; fall back to the bare name.
+    m = _re.search(r"视频路径: ([^\n]+)", prompt)
     filename = m.group(1).strip() if m else ""
+    if not filename:
+        m = _re.search(r"视频文件名: ([^\n]+)", prompt)
+        filename = m.group(1).strip() if m else ""
     m = _re.search(r"平台风格: ([^\n]+)", prompt)
     style = m.group(1).strip() if m else ""
     m = _re.search(r"标题字数限制: (\d+)", prompt)
     title_limit = int(m.group(1)) if m else 30
 
-    # Try to find the actual video file and look up prompts.csv
-    video_path = None
-    # Filename may be just the name; check the images dir
-    candidate_dirs = [
-        Path("/Users/hyx/ssd/codespace/personal/images"),
-        Path("~/ssd/codespace/personal/images").expanduser(),
-    ]
-    for base in candidate_dirs:
-        if not base.exists():
-            continue
-        for found in base.glob(f"**/{filename}"):
-            video_path = str(found)
-            break
-        if video_path:
-            break
+    video_path = _resolve_video_path(filename)
 
     # Get the real descriptive content from prompts.csv
     seed = _read_prompt_for_video(video_path) or "" if video_path else ""
@@ -434,6 +556,7 @@ def generate_content(video_path: str, platform: str = "xhs",
     prompt = f"""为以下视频生成{platform}平台的发布文案。
 
 视频文件名: {meta.get('name', '')}
+视频路径: {meta.get('path', '')}
 视频大小: {meta.get('size_mb', '?')} MB
 平台风格: {style}
 标题字数限制: {title_limit} 字以内
@@ -470,16 +593,24 @@ def generate_content(video_path: str, platform: str = "xhs",
         text = ""
 
     parsed = _parse_json_response(text) if text else None
-    if parsed and "title" in parsed:
-        # Truncate title to limit, strip hashtags
-        result = {
-            "title": str(parsed["title"])[:title_limit],
-            "description": str(parsed.get("description", ""))[:500],
-            "hashtags": [
-                h.lstrip("#").strip() for h in parsed.get("hashtags", [])[:5] if h
-            ],
-        }
-        return result
+    if isinstance(parsed, dict):
+        # A blank title is not a usable result: it would publish a post with no
+        # title at all. LLM output regularly contains `"title": ""`.
+        title = str(parsed.get("title") or "").strip()
+        if title:
+            raw_tags = parsed.get("hashtags") or []
+            if isinstance(raw_tags, str):      # tolerate a single string
+                raw_tags = [raw_tags]
+            result = {
+                "title": title[:title_limit],
+                "description": str(parsed.get("description") or "")[:500],
+                "hashtags": [
+                    str(h).lstrip("#").strip()
+                    for h in list(raw_tags)[:5] if str(h or "").strip()
+                ],
+            }
+            return result
+        # else: fall through to the heuristic path below
 
     # Fallback to heuristic content (smarter than pure deterministic placeholder)
     return _heuristic_content(video_path, platform)

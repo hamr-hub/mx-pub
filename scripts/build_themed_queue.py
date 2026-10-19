@@ -86,6 +86,14 @@ def cjk_collision(title: str, live: list[str]) -> str:
     return ""
 
 
+def local_ok_titles(queue_path: Path, platform: str) -> list[str]:
+    """Titles this queue records as server-confirmed posts on `platform`."""
+    queue = json.loads(queue_path.read_text())
+    return [v.get("title", "") for v in queue.get("videos", [])
+            if isinstance(v.get("published", {}).get(platform), dict)
+            and v["published"][platform].get("status") == "ok"]
+
+
 def validate_copy(entry: dict) -> list[str]:
     problems = []
     coll = entry.get("collection", "")
@@ -274,6 +282,17 @@ def main() -> int:
     truth["weixin"] = load_weixin_titles(args.queue)
     for platform in TARGET_PLATFORMS:
         print(f"   {platform}: {len(truth.get(platform, []))} live titles")
+
+    # A platform whose live fetch came back empty while THIS queue records
+    # confirmed posts there means the fetch silently failed — the duplicate
+    # gate would then approve every clip as new. A duplicate post is worse
+    # than a miss, so stop instead of building blind.
+    blind = [p for p in TARGET_PLATFORMS
+             if not truth.get(p) and local_ok_titles(args.queue, p)]
+    if blind:
+        sys.exit("[truth] live fetch returned 0 titles for "
+                 f"{', '.join(blind)} although the queue records confirmed "
+                 "posts there — refusing to build with a blind duplicate gate.")
 
     accepted, rejected = verify(spec, md5_index=global_index, truth=truth)
 

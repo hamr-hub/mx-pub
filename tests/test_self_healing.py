@@ -112,9 +112,16 @@ def test_classify_blocked():
 
 @t("errors.classify: ok status → no-op")
 def test_classify_ok():
-    from core.errors import classify, ErrorClass
+    """A successful publish is not a transient error.
+
+    This used to assert TRANSIENT, which is how successes ended up recorded
+    with cls="transient" and got counted by every error aggregate.
+    """
+    from core.errors import Action, ErrorClass, classify
     c = classify("anything", status="ok")
-    assert c.cls == ErrorClass.TRANSIENT
+    assert c.cls == ErrorClass.OK
+    assert c.severity == 0
+    assert c.action is Action.NONE
 
 
 # ---------------------------------------------------------------------------

@@ -103,10 +103,23 @@ just the ones in the current run — a single-platform run can no longer report
 `remaining: 0` over real pending work. `by_platform` in the queue file and the
 run summary show the per-platform breakdown.
 
+## Self-learning layer
+
+`mxpub.py publish` runs a pre-flight risk gate and an adaptive pacer around the
+batch driver. Three properties matter for trusting it:
+
+- A successful publish is classified `ErrorClass.OK`, never an error class, so
+  error aggregates only contain failures.
+- The risk window is bounded by age (24h), not just by event count — a bad run
+  last week cannot veto today's batch.
+- The pacer always records results, but only *gates* when `MX_PACING=1`
+  (it can insert multi-minute waits, which would otherwise silently change
+  publish throughput).
+
 ## Development
 
 ```bash
-python3 -m pytest            # 125 tests
+python3 -m pytest            # 205 tests
 python3 -m ruff check .      # lint gate (config in pyproject.toml)
 ```
 
@@ -154,11 +167,16 @@ python3 -m pytest tests/test_batch_policy.py   # batch policy regressions
 | `tests/test_batch_policy.py` | retry eligibility, mxpub→driver hand-off, pacing gate, queue totals, ApiWatch lifecycle |
 | `tests/test_safety_gate_flow.py` | end-to-end control flow of the safety gate in `run_platform` (fake Chrome, real loop) |
 | `tests/test_error_taxonomy.py` | classifier/retry-filter agreement across separator styles and driver markers |
+| `tests/test_risk_monitor.py` | risk verdicts: successes are not failures, stale history cannot veto a fresh run |
 | `tests/test_state_io.py` | atomic + concurrent state file writes, corrupt-file recovery |
 | `tests/test_self_healing.py` | error taxonomy, recovery, health, hooks, safety gate |
 | `tests/test_integration.py` | end-to-end pipeline: event log → risk → insights |
 | `tests/test_curation.py` | content selection primitives |
+| `tests/test_curation_cjk.py` | Chinese tokenisation/signatures (the queue is 100% Chinese) |
+| `tests/test_safety_precision.py` | safety gate: no false positives on the real queue, no false negatives on violations |
 | `tests/test_ai_providers.py` | provider fallback + platform-specific content |
+| `tests/test_ai_content_hardening.py` | blank titles, hashtag coercion, same-basename resolution, single tree walk |
+| `tests/test_collections_union.py` | Kuaishou collection membership union (type-safe, idempotent) |
 ## Self-healing & self-learning layer (2026-09)
 
 On top of the stable CDP driver, mx-pub now ships a self-healing +

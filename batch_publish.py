@@ -666,6 +666,37 @@ def recompute_totals(queue: dict, platforms: list | None = None) -> None:
     }
 
 
+def known_platforms() -> list[str]:
+    """Platform modules the registry knows about (falls back to the dir)."""
+    try:
+        from extension.registry import Registry, register_builtin_platforms
+        register_builtin_platforms()          # idempotent
+        names = [spec.name for spec in Registry.list_platforms()]
+        if names:
+            return sorted(names)
+    except Exception:
+        pass
+    here = HERE / "scripts" / "platforms"
+    return sorted(p.stem for p in here.glob("*.py") if not p.stem.startswith("_"))
+
+
+def validate_platforms(platforms: list[str]) -> list[str]:
+    """Drop unknown names with an explicit message.
+
+    A typo in ONLY_PLATFORMS used to reach the worker thread as
+    `No module named 'platforms.kuaishu2'` — after Chrome had already been
+    launched — and the rest of the batch still ran.
+    """
+    known = known_platforms()
+    valid = []
+    for name in platforms:
+        if name in known:
+            valid.append(name)
+        else:
+            print(f"❌ 未知平台 '{name}'（可用: {', '.join(known)}）")
+    return valid
+
+
 def main(platforms: list | None = None, *, retry_failed: bool = False,
          force: bool = False) -> int:
     """Run one batch.
@@ -674,12 +705,18 @@ def main(platforms: list | None = None, *, retry_failed: bool = False,
     (mxpub.py) get exactly the list they gated — previously the wrapper's
     --platform filter was silently discarded and the batch ran everywhere.
     """
+    # Validate before touching the browser: a bad name should cost nothing.
+    platforms = validate_platforms(
+        list(platforms) if platforms else resolve_platforms())
+    if not platforms:
+        print("❌ 没有可发布的平台。")
+        return 1
+
     env = get_env_summary()
     cdp_url = ensure_chrome(headless=env["is_headless"])
     print(f"🌍 cdp={cdp_url} headless={env['is_headless']}")
 
     queue = load_queue()
-    platforms = list(platforms) if platforms else resolve_platforms()
     if retry_failed:
         print("🔁 RETRY_FAILED: re-arming rows whose last attempt was a "
               "transient failure")

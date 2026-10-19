@@ -33,6 +33,7 @@ from typing import Optional
 
 
 class ErrorClass(str, Enum):
+    OK = "ok"                        # published successfully — never an error
     TRANSIENT = "transient"
     RECOVERABLE = "recoverable"
     CONTENT = "content"
@@ -52,6 +53,7 @@ class Action(str, Enum):
     ABORT_PLATFORM = "abort_platform"  # stop posting to this platform
     ABORT_BATCH = "abort_batch"      # stop the whole batch
     ESCALATE = "escalate"            # log + notify human
+    NONE = "none"                    # nothing to do (successful publish)
 
 
 @dataclass(frozen=True)
@@ -262,10 +264,14 @@ def classify(error: Optional[str], *,
             severity=2, cooldown_s=0.0, label="blocked",
             note="explicitly blocked (duration/codec/etc)")
     if status == "ok":
+        # A successful publish must never be recorded as a transient error:
+        # successes carried cls="transient", so every error aggregate counted
+        # them — the risk monitor reported "30/30 recent failures" for a
+        # platform with a 100% success rate.
         return Classification(
-            cls=ErrorClass.TRANSIENT, action=Action.RETRY,
+            cls=ErrorClass.OK, action=Action.NONE,
             severity=0, cooldown_s=0.0, label="ok",
-            note="treated as no-op")
+            note="published")
 
     # 1. Fatal infra (always last to win, but we want it early for clear
     #    config issues so escalation happens instead of futile retries).

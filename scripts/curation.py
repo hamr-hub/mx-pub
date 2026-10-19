@@ -36,6 +36,14 @@ STOP_WORDS = set(["a", "an", "the", "of", "in", "on", "at", "over", "through", "
 
 _CJK_RE = re.compile(r"[^a-z0-9一-鿿]+")
 
+# CJK has no spaces, so words are found with character bigrams — the standard
+# approach for Chinese without a segmenter. Without this the whole curation
+# layer was inert: every Chinese title produced an empty token list, so
+# `signature()` returned "" for all of them and select_unpublished() rejected
+# the entire corpus as "empty signature".
+_CJK_RUN = re.compile(r"[一-鿿]+")
+_ASCII_RUN = re.compile(r"[a-z0-9]+")
+
 
 def normalize(text: str) -> str:
     """Lowercase, split on non-alnum/CJK, collapse whitespace."""
@@ -44,9 +52,35 @@ def normalize(text: str) -> str:
 
 
 def content_tokens(text: str) -> list[str]:
-    """Distinctive ordered tokens: len>=4, no cinematic-direction vocabulary."""
-    return [w for w in re.sub(r"[^a-z0-9]+", " ", (text or "").lower()).split()
-            if len(w) >= 4 and w not in STOP_WORDS]
+    """Distinctive ordered tokens: ASCII words + CJK character bigrams.
+
+    ASCII runs keep the original rule (len>=4, minus the cinematic-direction
+    stop words). CJK runs become overlapping character bigrams, which capture
+    the subject matter ("深山瀑布" -> 深山/山瀑/瀑布) without needing a
+    word segmenter. Tokens stay in text order so `signature()` reflects the
+    topic, not an alphabetical accident.
+    """
+    text = (text or "").lower()
+    tokens: list[str] = []
+    pos = 0
+    for m in re.finditer(r"[a-z0-9]+|[一-鿿]+", text):
+        run = m.group(0)
+        if m.start() < pos:                     # never happens, cheap guard
+            continue
+        pos = m.end()
+        if _ASCII_RUN.fullmatch(run):
+            if len(run) >= 4 and run not in STOP_WORDS:
+                tokens.append(run)
+        else:
+            tokens.extend(_cjk_bigrams(run))
+    return tokens
+
+
+def _cjk_bigrams(run: str) -> list[str]:
+    """Overlapping character bigrams; a 1-char run yields itself."""
+    if len(run) == 1:
+        return [run]
+    return [run[i:i + 2] for i in range(len(run) - 1)]
 
 
 def signature(text: str, n: int = 7) -> str:
@@ -120,35 +154,61 @@ def md5_index(root: Path) -> dict[str, list[Path]]:
     return index
 
 
+# Renders are either the legacy video_N.mp4 tree or provider/version-prefixed
+# batches such as minimax-h3's pro_video_NN.mp4 (tracked in prompts.csv) and
+# the mmx_h3 rerun series v2_video_NN.mp4 (tracked in v2_prompts.csv).
+RENDER_NAME_RE = r"(?:[a-z0-9]+_)?video_\d+\.mp4"
+
+
 def read_daily_topics(day_dir: Path) -> dict[str, str]:
-    """video_N.mp4 -> topic_seed from all_providers.csv.
+    """video_N.mp4 -> topic_seed from all_providers.csv / prompts.csv.
 
     Failed rows carry an empty file_path but keep their index + topic_seed;
     fall back to video_<index>.mp4 so renders that landed despite a reported
-    failure still get metadata.
+    failure still get metadata. prompts.csv (mmx_h3 layout) carries the
+    English prompt in a `prompt` column instead of `topic_seed`.
     """
     topics: dict[str, str] = {}
-    for csv_path in day_dir.glob("**/all_providers.csv"):
-        with open(csv_path, newline="") as f:
-            for row in csv.DictReader(f):
-                if row.get("kind") != "video" or not row.get("topic_seed"):
-                    continue
-                base = os.path.basename(row.get("file_path") or "")
-                if re.fullmatch(r"video_\d+\.mp4", base):
-                    topics.setdefault(base, row["topic_seed"])
-                elif row.get("index", "").isdigit():
-                    topics.setdefault(f"video_{row['index']}.mp4",
-                                      row["topic_seed"])
+    manifests = [
+        ("all_providers.csv", "topic_seed"),
+        ("prompts.csv", "prompt"),
+        # versioned rerun manifests (v2_prompts.csv, v4_prompts.csv, ...) live
+        # beside the renders they produced.
+        ("*_prompts.csv", "prompt"),
+    ]
+    for manifest, seed_col in manifests:
+        for csv_path in day_dir.glob(f"**/{manifest}"):
+            # AppleDouble stubs (._foo.csv) are binary and would blow up the
+            # csv reader; _benchmark holds throwaway fixtures.
+            if csv_path.name.startswith("._") or "_benchmark" in csv_path.parts:
+                continue
+            with open(csv_path, newline="", encoding="utf-8-sig",
+                      errors="replace") as f:
+                for row in csv.DictReader(f):
+                    if row.get("kind") != "video" or not row.get(seed_col):
+                        continue
+                    base = os.path.basename(row.get("file_path") or "")
+                    if re.fullmatch(RENDER_NAME_RE, base):
+                        topics.setdefault(base, row[seed_col])
+                    elif row.get("index", "").isdigit():
+                        topics.setdefault(f"video_{row['index']}.mp4",
+                                          row[seed_col])
     return topics
 
 
 def daily_clips(root: Path) -> list[Clip]:
-    """All video_N.mp4 renders in YYYYMMDD / YYYY-MM-DD day directories."""
+    """All renders in YYYYMMDD / YYYY-MM-DD day directories.
+
+    Covers both layouts: legacy video_N.mp4 and provider batches
+    (pro_video_NN.mp4 under e.g. 20261014/mmx_h3).
+    """
     clips: list[Clip] = []
     for day_dir in sorted(p for p in root.iterdir() if p.is_dir()
                          and re.fullmatch(r"2026[-]?\d{4}", p.name)):
         topics = read_daily_topics(day_dir)
-        for mp4 in sorted(day_dir.glob("**/video_*.mp4")):
+        renders = list(day_dir.glob("**/video_*.mp4"))
+        renders += list(day_dir.glob("**/*_video_*.mp4"))
+        for mp4 in sorted(set(renders)):
             if mp4.name.startswith("._"):
                 continue
             clips.append(Clip(path=mp4, day=day_dir.name.replace("-", ""),
@@ -276,6 +336,21 @@ def _kuaishou_titles(page) -> list[str]:
     return titles
 
 
+def _platform_page(ctx, host: str, url: str, timeout_ms: int):
+    """Return a tab on `host`, opening one at `url` when none is open.
+
+    A missing tab used to yield an empty title set, which is indistinguishable
+    from "this account has published nothing" — the duplicate gate then
+    approved everything and the batch double-posted. Navigate instead: the
+    fetchers run same-origin `fetch()` and need the page to be on the host.
+    """
+    page = next((p for p in ctx.pages if host in p.url), None)
+    if page is None:
+        page = ctx.new_page()
+        page.goto(url, wait_until="domcontentloaded", timeout=timeout_ms)
+    return page
+
+
 def live_titles(cdp_url: str = "http://127.0.0.1:9222",
                 timeout_ms: int = 60000) -> dict[str, list[str]]:
     """Connect to the logged-in Chrome and return live title sets per platform.
@@ -285,20 +360,29 @@ def live_titles(cdp_url: str = "http://127.0.0.1:9222",
     """
     from playwright.sync_api import sync_playwright
 
+    targets = (
+        ("douyin", "creator.douyin.com",
+         "https://creator.douyin.com/creator-micro/content/manage",
+         _douyin_titles),
+        ("kuaishou", "cp.kuaishou.com",
+         "https://cp.kuaishou.com/article/manage/video",
+         _kuaishou_titles),
+    )
+
     out: dict[str, list[str]] = {}
     with sync_playwright() as pw:
         browser = pw.chromium.connect_over_cdp(cdp_url, timeout=timeout_ms)
         ctx = browser.contexts[0]
-        try:
-            dy = next(p for p in ctx.pages if "creator.douyin.com" in p.url)
-            out["douyin"] = _douyin_titles(dy)
-        except StopIteration:
-            out["douyin"] = []
-        try:
-            ks = next(p for p in ctx.pages if "cp.kuaishou.com" in p.url)
-            out["kuaishou"] = _kuaishou_titles(ks)
-        except StopIteration:
-            out["kuaishou"] = []
+        for key, host, url, fetch in targets:
+            page = _platform_page(ctx, host, url, timeout_ms)
+            try:
+                out[key] = fetch(page)
+            except Exception as e:
+                # Fail LOUD: an empty set here silently disables the
+                # duplicate gate that is the whole point of this call.
+                raise RuntimeError(
+                    f"server truth for {key} failed; refusing to hand back an "
+                    f"empty title set: {str(e)[:150]}") from e
     return out
 
 
